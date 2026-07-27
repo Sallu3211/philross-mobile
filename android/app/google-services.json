@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "323198781293",
+    "project_id": "phil-ross-10b10",
+    "storage_bucket": "phil-ross-10b10.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:323198781293:android:3f0f98c505ca2100aa3c64",
+        "android_client_info": {
+          "package_name": "com.philross"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "323198781293-ro0aloip52n05nji1mhhttorno096gmo.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.philross",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "323198781293-0q2vpo2e68khshf9u35j4teiknej1tml.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAiEqyRGOUtZU0SOiyFxsS3SoMmlOwT_Nk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "323198781293-0q2vpo2e68khshf9u35j4teiknej1tml.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "323198781293-la2bee3k2av1ra3q5cj49vegq4qubjcb.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.philross",
+                "app_store_id": "6751194230"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

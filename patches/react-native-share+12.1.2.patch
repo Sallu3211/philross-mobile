@@ -1,0 +1,24 @@
+diff --git a/node_modules/react-native-share/android/build.gradle b/node_modules/react-native-share/android/build.gradle
+index 844e782..8b86297 100644
+--- a/node_modules/react-native-share/android/build.gradle
++++ b/node_modules/react-native-share/android/build.gradle
+@@ -27,7 +27,7 @@ if (isNewArchitectureEnabled()) {
+ }
+ 
+ android {
+-    namespace = "cl.json"
++    namespace "cl.json"
+     compileSdkVersion safeExtGet('compileSdkVersion', 34)
+     defaultConfig {
+         minSdkVersion safeExtGet('minSdkVersion', 16)
+diff --git a/node_modules/react-native-share/android/src/main/AndroidManifest.xml b/node_modules/react-native-share/android/src/main/AndroidManifest.xml
+index dd0b5ce..837d87e 100644
+--- a/node_modules/react-native-share/android/src/main/AndroidManifest.xml
++++ b/node_modules/react-native-share/android/src/main/AndroidManifest.xml
+@@ -1,5 +1,4 @@
+-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+-    package="cl.json">
++<manifest xmlns:android="http://schemas.android.com/apk/res/android" >
+ 
+     <application>
+         <provider

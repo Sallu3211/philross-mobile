@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">Master Phil</string>
+    <string name="google_maps_api_key">AIzaSyDFxmKbo9cbdZXLT9jBsTW8AcLZpautTwU</string>
+    <string name="clevertap_account_id">RZZ-RWW-757Z</string>
+    <string name="clevertap_token">002-112</string>
+</resources>

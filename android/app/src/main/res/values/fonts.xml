@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="font_family_open_sans_regular">OpenSans-Regular</string>
+    <string name="font_family_open_sans_bold">OpenSans-Bold</string>
+    <string name="font_family_playfair_display_semibold">PlayfairDisplay-SemiBold</string>
+</resources>

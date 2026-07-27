@@ -1,0 +1,14 @@
+diff --git a/node_modules/react-native-image-picker/android/src/main/AndroidManifest.xml b/node_modules/react-native-image-picker/android/src/main/AndroidManifest.xml
+index 2209799..34b57d7 100644
+--- a/node_modules/react-native-image-picker/android/src/main/AndroidManifest.xml
++++ b/node_modules/react-native-image-picker/android/src/main/AndroidManifest.xml
+@@ -1,8 +1,6 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <manifest
+-  xmlns:android="http://schemas.android.com/apk/res/android"
+-  package="com.imagepicker"
+-  >
++  xmlns:android="http://schemas.android.com/apk/res/android" >
+     <application>
+       <provider
+             android:name=".ImagePickerProvider"
