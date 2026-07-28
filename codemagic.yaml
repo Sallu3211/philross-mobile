@@ -1,0 +1,105 @@
+workflows:
+  ios-release:
+    name: PhilRoss iOS Release
+    max_build_duration: 90
+    instance_type: mac_mini_m2
+    environment:
+      groups:
+        # Create this group in Codemagic UI (Teams > your team > Environment variables)
+        # and add: APP_STORE_CONNECT_ISSUER_ID, APP_STORE_CONNECT_KEY_IDENTIFIER,
+        # APP_STORE_CONNECT_PRIVATE_KEY, CERTIFICATE_PRIVATE_KEY (if using manual signing)
+        - appstore_credentials
+      vars:
+        BUNDLE_ID: "com.philross"
+        XCODE_WORKSPACE: "ios/philross.xcworkspace"
+        XCODE_SCHEME: "philross"
+      node: 20.19.0
+      xcode: latest
+      cocoapods: default
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+      cancel_previous_builds: true
+    integrations:
+      app_store_connect: appstore_credentials
+    scripts:
+      - name: Install npm dependencies
+        script: |
+          yarn install --frozen-lockfile
+      - name: Install CocoaPods dependencies
+        script: |
+          cd ios && pod install
+      - name: Set up code signing (automatic)
+        script: |
+          xcode-project use-profiles
+      - name: Increment build number
+        script: |
+          cd ios && agvtool new-version -all $(($(app-store-connect get-latest-testflight-build-number "$BUNDLE_ID") + 1))
+      - name: Build ipa for App Store distribution
+        script: |
+          xcode-project build-ipa \
+            --workspace "$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      # Uncomment once ready to auto-submit to TestFlight instead of just building
+      # app_store_connect:
+      #   auth: integration
+      #   submit_to_testflight: true
+      email:
+        recipients:
+          - devops@triotechsystems.com
+        notify:
+          success: true
+          failure: true
+
+  android-release:
+    name: PhilRoss Android Release (mirrors local build, optional)
+    max_build_duration: 60
+    instance_type: linux_x2
+    environment:
+      groups:
+        # Create this group in Codemagic UI and add:
+        # CM_KEYSTORE (base64-encoded philross.keystore), CM_KEYSTORE_PASSWORD,
+        # CM_KEY_ALIAS, CM_KEY_PASSWORD, GOOGLE_PLAY_SERVICE_ACCOUNT_JSON (as file or var)
+        - android_credentials
+      node: 20.19.0
+      java: 17
+      vars:
+        PACKAGE_NAME: "com.philross"
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+      cancel_previous_builds: true
+    scripts:
+      - name: Install npm dependencies
+        script: |
+          yarn install --frozen-lockfile
+      - name: Decode keystore
+        script: |
+          echo $CM_KEYSTORE | base64 --decode > android/app/philross.keystore
+      - name: Build Android release bundle
+        script: |
+          cd android && ./gradlew bundleRelease
+    artifacts:
+      - android/app/build/outputs/**/*.aab
+      - android/app/build/outputs/**/mapping.txt
+    publishing:
+      # Uncomment once the Play Console service account JSON is wired in as a Codemagic integration
+      # google_play:
+      #   credentials: $GOOGLE_PLAY_SERVICE_ACCOUNT_JSON
+      #   track: internal
+      email:
+        recipients:
+          - devops@triotechsystems.com
+        notify:
+          success: true
+          failure: true
