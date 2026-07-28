@@ -20,7 +20,7 @@ workflows:
       events:
         - push
       branch_patterns:
-        - pattern: main
+        - pattern: master
           include: true
       cancel_previous_builds: true
     integrations:
@@ -53,7 +53,7 @@ workflows:
       #   submit_to_testflight: true
       email:
         recipients:
-          - devops@triotechsystems.com
+          - Chrisavans321@gmail.com
         notify:
           success: true
           failure: true
@@ -76,7 +76,7 @@ workflows:
       events:
         - push
       branch_patterns:
-        - pattern: main
+        - pattern: master
           include: true
       cancel_previous_builds: true
     scripts:
@@ -99,7 +99,7 @@ workflows:
       #   track: internal
       email:
         recipients:
-          - devops@triotechsystems.com
+          - Chrisavans321@gmail.com
         notify:
           success: true
           failure: true
