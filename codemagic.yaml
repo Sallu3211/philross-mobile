@@ -53,7 +53,7 @@ workflows:
       #   submit_to_testflight: true
       email:
         recipients:
-          - Chrisavans321@gmail.com
+          - info@byterisellc.com
         notify:
           success: true
           failure: true
@@ -99,7 +99,7 @@ workflows:
       #   track: internal
       email:
         recipients:
-          - Chrisavans321@gmail.com
+          - info@byterisellc.com
         notify:
           success: true
           failure: true
