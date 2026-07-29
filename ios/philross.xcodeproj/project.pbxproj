@@ -18,6 +18,8 @@
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
 		84D8E3357178402FA6601B69 /* PlayfairDisplay-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = BC997F0B96AB485899EC76AF /* PlayfairDisplay-SemiBold.ttf */; };
 		E3BF7C1E8490493588C2846A /* OpenSans-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = D0FE198FDD4442BC931AB767 /* OpenSans-Bold.ttf */; };
+		34818EB42F044AA78DA3F766 /* BootSplash.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 0FF88C02BE2B4AA5BCAA2195 /* BootSplash.storyboard */; };
+		3B406F4978A542B2A458E67A /* Colors.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F1F2089E109540D7A308B1E4 /* Colors.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -43,6 +45,8 @@
 		BC997F0B96AB485899EC76AF /* PlayfairDisplay-SemiBold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "PlayfairDisplay-SemiBold.ttf"; path = "../app/assets/fonts/PlayfairDisplay-SemiBold.ttf"; sourceTree = "<group>"; };
 		D0FE198FDD4442BC931AB767 /* OpenSans-Bold.ttf */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; name = "OpenSans-Bold.ttf"; path = "../app/assets/fonts/OpenSans-Bold.ttf"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
+		0FF88C02BE2B4AA5BCAA2195 /* BootSplash.storyboard */ = {isa = PBXFileReference; name = "BootSplash.storyboard"; path = "philross/BootSplash.storyboard"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		F1F2089E109540D7A308B1E4 /* Colors.xcassets */ = {isa = PBXFileReference; name = "Colors.xcassets"; path = "philross/Colors.xcassets"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = folder.assetcatalog; explicitFileType = undefined; includeInIndex = 0; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -71,6 +75,8 @@
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
 				18C3319E2E4357BE00B82E7A /* philross-Bridging-Header.h */,
+				0FF88C02BE2B4AA5BCAA2195 /* BootSplash.storyboard */,
+				F1F2089E109540D7A308B1E4 /* Colors.xcassets */,
 			);
 			name = philross;
 			sourceTree = "<group>";
@@ -214,6 +220,8 @@
 				E3BF7C1E8490493588C2846A /* OpenSans-Bold.ttf in Resources */,
 				4E37FF34157647F8970E33A9 /* OpenSans-Regular.ttf in Resources */,
 				84D8E3357178402FA6601B69 /* PlayfairDisplay-SemiBold.ttf in Resources */,
+				34818EB42F044AA78DA3F766 /* BootSplash.storyboard in Resources */,
+				3B406F4978A542B2A458E67A /* Colors.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

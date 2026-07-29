@@ -1,27 +1,26 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+<manifest
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
-
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="com.android.vending.BILLING"/>
+    <uses-permission android:name="com.android.vending.BILLING" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-    
-    <!-- Push Notification Permissions -->
+
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    
-    <!-- Location Permissions for Maps -->
+
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
-    <!-- Camera Permission -->
     <uses-permission android:name="android.permission.CAMERA" />
-    <uses-feature android:name="android.hardware.camera" android:required="false" />
-    <uses-feature android:name="android.hardware.camera.front" android:required="false" />
-
-    <!-- Storage Permissions -->
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.camera.front"
+        android:required="false" />
 
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
@@ -41,16 +40,13 @@
         android:theme="@style/BootSplashTheme"
         android:supportsRtl="true"
         android:usesCleartextTraffic="true">
-
-        <!-- Required for CleverTap -->
         <meta-data
             android:name="CLEVERTAP_ACCOUNT_ID"
             android:value="@string/clevertap_account_id" />
         <meta-data
             android:name="CLEVERTAP_TOKEN"
             android:value="@string/clevertap_token" />
-        
-        <!-- CleverTap Push Notification Service -->
+
         <service
             android:name="com.clevertap.android.sdk.pushnotification.fcm.FcmMessageListenerService"
             android:exported="false">
@@ -58,8 +54,7 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
-        
-        <!-- React Native Firebase Messaging Service -->
+
         <service
             android:name="io.invertase.firebase.messaging.ReactNativeFirebaseMessagingService"
             android:exported="true"
@@ -68,8 +63,7 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
-        
-        <!-- CleverTap Push Notification Receiver -->
+
         <receiver
             android:name="com.clevertap.android.sdk.pushnotification.CTPushNotificationReceiver"
             android:exported="false">
@@ -77,13 +71,11 @@
                 <action android:name="com.clevertap.PUSH_NOTIFICATION_CLICKED" />
             </intent-filter>
         </receiver>
-        
-        <!-- Google Maps API Key -->
+
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyDFxmKbo9cbdZXLT9jBsTW8AcLZpautTwU" />
-        
-        <!-- Firebase Messaging Configuration -->
+
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
             android:resource="@mipmap/ic_launcher"
@@ -108,7 +100,7 @@
             </intent-filter>
         </receiver>
 
-         <meta-data
+        <meta-data
             android:name="com.dieam.reactnativepushnotification.notification_foreground"
             android:value="true" />
 
@@ -150,7 +142,7 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
-        
+
         <activity
             android:name=".MainActivity"
             android:label="@string/app_name"
@@ -158,24 +150,23 @@
             android:launchMode="singleTask"
             android:windowSoftInputMode="adjustResize"
             android:screenOrientation="fullSensor"
-            android:exported="true">
-            
+            android:exported="true"
+            android:theme="@style/BootTheme">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <!-- Debug activities - only for debug builds -->
-        <activity 
+        <activity
             android:name="com.superwall.sdk.debug.DebugViewActivity"
             android:exported="false"
             tools:ignore="UnusedActivity" />
-        <activity 
+        <activity
             android:name="com.superwall.sdk.debug.localizations.SWLocalizationActivity"
             android:exported="false"
             tools:ignore="UnusedActivity" />
-        <activity 
+        <activity
             android:name="com.superwall.sdk.debug.SWConsoleActivity"
             android:exported="false"
             tools:ignore="UnusedActivity" />
@@ -185,6 +176,5 @@
             android:theme="@style/Theme.MaterialComponents.DayNight.NoActionBar"
             android:configChanges="orientation|screenSize|keyboardHidden"
             tools:replace="android:theme" />
-
     </application>
 </manifest>
