@@ -58,10 +58,9 @@ workflows:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
     publishing:
-      # Uncomment once ready to auto-submit to TestFlight instead of just building
-      # app_store_connect:
-      #   auth: integration
-      #   submit_to_testflight: true
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
       email:
         recipients:
           - info@byterisellc.com
