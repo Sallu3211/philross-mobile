@@ -41,6 +41,8 @@
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>CleverTapAccountID</key>
 	<string>RZZ-RWW-757Z</string>
 	<key>CleverTapToken</key>
