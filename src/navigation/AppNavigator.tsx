@@ -4,6 +4,7 @@ import { useUser } from '../context/UserContext';
 import SplashScreen from '../screens/SplashScreen';
 import LoginScreen from '../screens/LoginScreen';
 import SignUpScreen from '../screens/SignUpScreen';
+import DashboardScreen from '../screens/DashboardScreen';
 import FeedScreen from '../screens/FeedScreen';
 import VideoScreen from '../screens/VideoScreen';
 import EventsScreen from '../screens/EventsScreen';
@@ -28,10 +29,12 @@ const Stack = createStackNavigator();
 const AppNavigator = () => {
   const { isLoggedIn, isLoading } = useUser();
 
-  // Determine initial route based on login status
+  // Determine initial route based on login status.
+  // Logged-in members land on the Dashboard; Feed is still reachable from it.
+  // To revert the home screen, change 'Dashboard' back to 'Feed' here.
   const getInitialRoute = () => {
     if (isLoading) return 'Splash';
-    return isLoggedIn ? 'Feed' : 'Splash';
+    return isLoggedIn ? 'Dashboard' : 'Splash';
   };
 
   return (
@@ -44,6 +47,7 @@ const AppNavigator = () => {
         <Stack.Screen name="Splash" component={SplashScreen} />
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="SignUp" component={SignUpScreen} />
+        <Stack.Screen name="Dashboard" component={DashboardScreen} />
         <Stack.Screen name="Feed" component={FeedScreen} />
         <Stack.Screen name="Video" component={VideoScreen} />
         <Stack.Screen name="Events" component={EventsScreen} />

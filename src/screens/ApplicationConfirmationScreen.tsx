@@ -27,7 +27,7 @@ const ApplicationConfirmationScreen = ({ navigation }: any) => {
   };
 
   const handleReturnToFeed = () => {
-    navigation.navigate('Feed');
+    navigation.navigate('Dashboard');
   };
 
   return (

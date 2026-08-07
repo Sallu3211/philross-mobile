@@ -126,7 +126,7 @@ const SignUpScreen = ({ navigation }: any) => {
         resetForm();
         
         // Navigate to Feed immediately after successful signup
-        navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'Feed' }], }));
+        navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'Dashboard' }], }));
       } else {
         // Handle field-specific errors
         if (response?.fieldErrors && typeof response.fieldErrors === 'object') {
@@ -327,7 +327,7 @@ const SignUpScreen = ({ navigation }: any) => {
           console.error('Failed to store tokens:', storageError);
         }
 
-        navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'Feed' }], }));
+        navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'Dashboard' }], }));
       }
 
     } catch (error: any) {

@@ -11,8 +11,8 @@ const SplashScreen = ({ navigation }: any) => {
     const timer = setTimeout(() => {
       if (!isLoading) {
         if (isLoggedIn) {
-          // User is already logged in, go to Feed
-          navigation.replace('Feed');
+          // User is already logged in, go to the Dashboard
+          navigation.replace('Dashboard');
         } else {
           // User is not logged in, go to Login
           navigation.replace('Login');

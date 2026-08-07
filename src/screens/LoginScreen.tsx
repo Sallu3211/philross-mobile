@@ -167,7 +167,7 @@ const LoginScreen = ({ navigation, route }: any) => {
         } else { await EncryptedStorage.removeItem('rememberedUser'); }
         
         // Navigate to Feed
-        navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'Feed' }], }));
+        navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'Dashboard' }], }));
       } else {
         // Handle field-specific errors
         if (response?.fieldErrors && typeof response.fieldErrors === 'object') {
@@ -381,7 +381,7 @@ const LoginScreen = ({ navigation, route }: any) => {
           console.error('Failed to store tokens:', storageError);
         }
 
-        navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'Feed' }], }));
+        navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'Dashboard' }], }));
       }
     } catch (error: any) {
       console.error(`Error during ${provider} authentication:`, error);
