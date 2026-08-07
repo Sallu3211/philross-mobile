@@ -68,6 +68,41 @@ workflows:
           success: true
           failure: true
 
+  android-debug:
+    # Produces an installable DEBUG APK for on-device UI review.
+    #
+    # Why this exists: a debug APK loads its JavaScript from a Metro dev server
+    # instead of baking it into the binary. Install it once, then every JS/UI
+    # change hot-reloads over USB with no rebuild and no local Android SDK.
+    # Only native changes (new pods/gradle deps, icons, splash) need a new APK.
+    #
+    # Deliberately has NO `triggering:` block — it never runs on push. Start it
+    # by hand from the Codemagic UI ("Start new build" → this workflow).
+    name: PhilRoss Android Debug APK (manual, for device testing)
+    max_build_duration: 45
+    instance_type: linux_x2
+    environment:
+      node: 20.19.0
+      java: 17
+      vars:
+        PACKAGE_NAME: "com.philross"
+    scripts:
+      - name: Install npm dependencies
+        script: |
+          yarn install
+      - name: Build debug APK
+        script: |
+          cd android && ./gradlew assembleDebug
+    artifacts:
+      - android/app/build/outputs/apk/debug/*.apk
+    publishing:
+      email:
+        recipients:
+          - info@byterisellc.com
+        notify:
+          success: true
+          failure: true
+
   android-release:
     name: PhilRoss Android Release (mirrors local build, optional)
     max_build_duration: 60
