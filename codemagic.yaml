@@ -80,7 +80,11 @@ workflows:
     # by hand from the Codemagic UI ("Start new build" → this workflow).
     name: PhilRoss Android Debug APK (manual, for device testing)
     max_build_duration: 45
-    instance_type: linux_x2
+    # macOS, not linux_x2: the Linux instances need a paid Codemagic plan, and
+    # a build requesting one fails instantly with "instance type is not
+    # available with the current billing plan". The macOS images ship with the
+    # Android SDK and build an APK perfectly well.
+    instance_type: mac_mini_m2
     environment:
       node: 20.19.0
       java: 17
