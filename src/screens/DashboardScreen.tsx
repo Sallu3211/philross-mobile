@@ -41,21 +41,22 @@ import { StatusTone } from '../components/ui/StatusChip';
 import {
   Calendar,
   Check,
+  CheckCircle,
   Clock,
   Coach,
   Courses,
   Gift,
   Info,
-  InProgress,
   Lock,
+  LockCircle,
   Menu,
   Play,
+  ProgressCircle,
   Shop,
   IconProps,
 } from '../components/ui/icons';
 
 import useDashboardData, { FREE_TRIAL_DAYS } from '../hooks/useDashboardData';
-import { checkSubscriptionAndProceed } from '../services/subscriptionService';
 
 const greetingFor = (date: Date) => {
   const h = date.getHours();
@@ -75,10 +76,22 @@ const DashboardScreen = ({ navigation }: any) => {
     [user],
   );
 
-  /** Everything paywalled routes through the existing Superwall/RevenueCat flow. */
-  const openPaywall = useCallback((onUnlocked?: () => void) => {
-    checkSubscriptionAndProceed(() => onUnlocked?.());
-  }, []);
+  /**
+   * Opens our own paywall rather than the Superwall-hosted one. The remote
+   * template couldn't follow the app's design and never surfaced the Play
+   * Console free-trial offer, so members never saw the first week was free.
+   */
+  const openPaywall = useCallback(
+    (onUnlocked?: () => void) => {
+      navigation.navigate('Paywall', {
+        onSuccess: () => {
+          onUnlocked?.();
+          d.refresh();
+        },
+      });
+    },
+    [navigation, d],
+  );
 
   /** CourseDetails reads BOTH courseId and courseSlug from its route params. */
   const openCourse = useCallback(
@@ -274,28 +287,31 @@ const DashboardScreen = ({ navigation }: any) => {
           loading={d.loading}
         />
 
-        {/* 3 ── KPI row. Sits directly under the hero so the three counts read
-             as part of the progress story, before any sales messaging. */}
-        <View style={styles.kpiRow}>
+        {/* 3 ── KPI group. Sits directly under the hero so the three counts read
+             as part of the progress story, before any sales messaging.
+             One card, three segments, hairline dividers between them. */}
+        <View style={styles.kpiCard}>
           <StatTile
             value={d.completedCount}
             label="Completed"
-            icon={Check}
+            icon={CheckCircle}
             tint={theme.color.status.success}
             loading={d.loading}
           />
+          <View style={styles.kpiDivider} />
           <StatTile
             value={d.coursesInProgress}
             label="In progress"
-            icon={InProgress}
+            icon={ProgressCircle}
             tint={theme.color.progress.fill}
             loading={d.loading}
             onPress={() => navigation.navigate('Courses')}
           />
+          <View style={styles.kpiDivider} />
           <StatTile
             value={d.lockedCount}
             label="Locked"
-            icon={Lock}
+            icon={LockCircle}
             tint={theme.color.neutral[500]}
             loading={d.loading}
             onPress={() => openPaywall()}
@@ -358,8 +374,9 @@ const DashboardScreen = ({ navigation }: any) => {
                   key={String(item.id)}
                   item={item}
                   onPress={openFeedItem}
-                  width={188}
-                  showMeter={false}
+                  width={168}
+                  height={116}
+                  mediaOnly
                 />
               ))}
             </ScrollView>
@@ -441,9 +458,20 @@ const styles = StyleSheet.create({
     fontSize: theme.type.bodySm.fontSize,
     color: theme.color.brand.base,
   },
-  kpiRow: {
+  /** One card holding all three counts. */
+  kpiCard: {
     flexDirection: 'row',
-    gap: theme.space.md,
+    alignItems: 'stretch',
+    backgroundColor: theme.color.surface.card,
+    borderRadius: theme.radius.lg,
+    paddingHorizontal: theme.space.xs,
+    ...theme.shadow.sm,
+  },
+  /** Hairline between segments — inset top and bottom so it reads as a rule. */
+  kpiDivider: {
+    width: StyleSheet.hairlineWidth,
+    backgroundColor: theme.color.border.subtle,
+    marginVertical: theme.space.lg,
   },
   section: {
     gap: theme.space.lg,

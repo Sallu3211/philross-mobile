@@ -6,6 +6,7 @@ import Superwall, {
 } from '@superwall/react-native-superwall';
 import EncryptedStorage from 'react-native-encrypted-storage';
 import { Platform } from 'react-native';
+import { navigateFromAnywhere } from '../navigation/navigationRef';
 
 export type PaywallResult =
   | { type: 'purchased'; productId: string }
@@ -53,11 +54,41 @@ export function setupRevenueCatListener() {
   );
 }
 
+/**
+ * Gate for anything paywalled.
+ *
+ * If the member is entitled, runs `onSuccess`. Otherwise it opens our own
+ * PaywallScreen. It used to hand off to a Superwall-hosted paywall, which
+ * pointed at the wrong products and never showed the free trial.
+ *
+ * Callers (FeedScreen, FeedCard, DashboardScreen) do not need to change — the
+ * signature is the same.
+ */
 export async function checkSubscriptionAndProceed(
   onSuccess: () => void,
   onCancel?: () => void,
 ) {
-  console.log('checkSubscriptionAndProceed >>>> 1 ');
+  const entitlementIds = await hasActiveSubscription();
+  const isSubscribed =
+    Array.isArray(entitlementIds) && entitlementIds.length > 0;
+
+  if (isSubscribed) {
+    onSuccess();
+    return;
+  }
+
+  const opened = navigateFromAnywhere('Paywall', { onSuccess });
+  if (!opened) {
+    // Navigation tree not mounted yet — nothing we can usefully show.
+    onCancel?.();
+  }
+}
+
+/** Superwall-based flow, kept for reference. No longer called. */
+async function legacySuperwallFlow(
+  onSuccess: () => void,
+  onCancel?: () => void,
+) {
   const entitlementIds = await hasActiveSubscription();
   const isSubscribed =
     Array.isArray(entitlementIds) && entitlementIds.length > 0;
@@ -69,8 +100,6 @@ export async function checkSubscriptionAndProceed(
   if (isSubscribed) {
     onSuccess();
   }
-
-  console.log('checkSubscriptionAndProceed >>>> 2 ');
 
   const checkAndUpdatePaywall = async () => {
     await Purchases.syncPurchases();

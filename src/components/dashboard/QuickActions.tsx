@@ -89,13 +89,14 @@ const styles = StyleSheet.create({
   },
   tile: {
     backgroundColor: theme.color.surface.card,
-    borderRadius: theme.radius.lg,
-    borderWidth: 1,
-    borderColor: theme.color.border.subtle,
+    borderRadius: 16,
     paddingVertical: theme.space.lg,
     paddingHorizontal: theme.space.sm,
     alignItems: 'center',
-    ...theme.shadow.sm,
+    // Flat: no border AND no elevation. Android's elevation shadow hugs the
+    // rounded edge so tightly that against the off-white page it reads as a
+    // second outline just inside the first — the "double border" effect. A
+    // plain white fill on the off-white page separates the tile on its own.
   },
   tileFallback: {
     flexGrow: 1,
@@ -108,7 +109,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: theme.space.md,
-    ...theme.shadow.sm,
+    // No elevation here either — a shadow on a small solid disc inside an
+    // already-elevated tile was the second source of doubled edges.
   },
   label: {
     fontFamily: theme.font.semibold,

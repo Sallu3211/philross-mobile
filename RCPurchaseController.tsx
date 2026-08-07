@@ -11,6 +11,7 @@ import Superwall, {
 } from '@superwall/react-native-superwall';
 import Purchases, {
   type CustomerInfo,
+  LOG_LEVEL,
   PRODUCT_CATEGORY,
   type PurchasesStoreProduct,
   type SubscriptionOption,
@@ -22,11 +23,18 @@ export class RCPurchaseController extends PurchaseController {
   constructor() {
     super();
     const apiKey = Platform.OS === 'ios' ? 'appl_GDYAgBcutJFhxnyAXcSFtfIFukw' : 'goog_JfzOnzKpWpKFjywipQWVmIFwcth';
-    
+
+    // Debug builds only: logs every product fetch and offering lookup, which is
+    // the only way to see whether the store actually returned our products and
+    // their trial phases. Never enabled in release.
+    if (__DEV__) {
+      Purchases.setLogLevel(LOG_LEVEL.VERBOSE);
+    }
+
     // Configure RevenueCat with better error handling for development
-    Purchases.configure({ 
-      apiKey, 
-      automaticDeviceIdentifierCollectionEnabled: true, 
+    Purchases.configure({
+      apiKey,
+      automaticDeviceIdentifierCollectionEnabled: true,
       diagnosticsEnabled: __DEV__ // Only enable diagnostics in development
     });
 

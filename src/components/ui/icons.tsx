@@ -21,6 +21,8 @@ export interface IconProps {
   color?: string;
   /** Kept for call-site compatibility; filled glyphs ignore it. */
   weight?: number;
+  /** Knockout colour for the *Circle variants. Defaults to white. */
+  glyphColor?: string;
 }
 
 type Icon = React.FC<IconProps>;
@@ -195,6 +197,40 @@ export const Flame: Icon = ({ size, color = INK }) => (
   </Base>
 );
 
+/* ── Circular badge variants ────────────────────────────────────────────────
+ * A filled disc with the glyph knocked out in white. Used on the dashboard KPI
+ * row, where a bare glyph beside a large number looked weightless — the disc
+ * gives each count a consistent visual anchor without a separate badge view.
+ */
+
+export const CheckCircle: Icon = ({ size, color = INK, glyphColor = '#FFFFFF' }) => (
+  <Base size={size}>
+    <Circle cx="12" cy="12" r="10.4" fill={color} />
+    <Path
+      d="M16.9 8.6a1.15 1.15 0 010 1.65l-5.5 5.5a1.15 1.15 0 01-1.65 0l-2.65-2.65a1.17 1.17 0 011.65-1.65l1.83 1.82 4.67-4.67a1.15 1.15 0 011.65 0z"
+      fill={glyphColor}
+    />
+  </Base>
+);
+
+/** Filled disc with a white half — "in progress". */
+export const ProgressCircle: Icon = ({ size, color = INK, glyphColor = '#FFFFFF' }) => (
+  <Base size={size}>
+    <Circle cx="12" cy="12" r="10.4" fill={color} />
+    <Path d="M12 4.75a7.25 7.25 0 010 14.5v-14.5z" fill={glyphColor} />
+  </Base>
+);
+
+export const LockCircle: Icon = ({ size, color = INK, glyphColor = '#FFFFFF' }) => (
+  <Base size={size}>
+    <Circle cx="12" cy="12" r="10.4" fill={color} />
+    <Path
+      d="M9.15 10.35V9.3a2.85 2.85 0 015.7 0v1.05c.83.16 1.45.89 1.45 1.76v3.4c0 .99-.8 1.79-1.79 1.79H9.49c-.99 0-1.79-.8-1.79-1.79v-3.4c0-.87.62-1.6 1.45-1.76zm1.5-.06h2.7V9.3a1.35 1.35 0 10-2.7 0v.99z"
+      fill={glyphColor}
+    />
+  </Base>
+);
+
 export const Icons = {
   Menu,
   ChevronRight,
@@ -211,6 +247,9 @@ export const Icons = {
   Gift,
   InProgress,
   Flame,
+  CheckCircle,
+  ProgressCircle,
+  LockCircle,
 };
 
 export default Icons;

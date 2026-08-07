@@ -1,12 +1,13 @@
 /**
- * StatTile — a single headline number.
+ * StatTile — one segment of the KPI group.
  *
- * A stat tile, not a one-bar bar chart: when the data is one current value the
- * right form is the number itself, set large, with a quiet label under it.
- * Three of these form the dashboard's KPI row.
+ * Deliberately borderless and transparent: the three tiles sit inside a single
+ * card in DashboardScreen, separated by hairline dividers. Three separate
+ * bordered boxes read as three competing objects; one card with dividers reads
+ * as one figure broken into parts, which is what these counts actually are.
  *
- * Fixed internal geometry (icon badge, then value, then label) so three tiles
- * side by side align on every row regardless of label length.
+ * Within a segment the icon sits on the same line as the count, the pair
+ * centred together, with the label centred underneath.
  */
 
 import React from 'react';
@@ -24,7 +25,7 @@ export interface StatTileProps {
   value: string | number;
   label: string;
   icon?: React.FC<IconProps>;
-  /** Solid fill for the icon badge. Text always stays in text tokens. */
+  /** Icon colour. The count and label always wear text tokens. */
   tint?: string;
   onPress?: () => void;
   loading?: boolean;
@@ -44,20 +45,19 @@ export const StatTile: React.FC<StatTileProps> = ({
 
   return (
     <Container
-      style={[styles.tile, style]}
+      style={[styles.segment, style]}
       onPress={onPress}
-      activeOpacity={0.85}
+      activeOpacity={0.7}
       accessibilityRole={onPress ? 'button' : undefined}
       accessibilityLabel={`${label}: ${value}`}
     >
-      {!!IconCmp && (
-        <View style={[styles.badge, { backgroundColor: tint }]}>
-          <IconCmp size={16} color={theme.color.text.inverse} />
-        </View>
-      )}
-      <Text style={styles.value} allowFontScaling={false} numberOfLines={1}>
-        {loading ? '—' : value}
-      </Text>
+      <View style={styles.valueRow}>
+        {!!IconCmp && <IconCmp size={17} color={tint} />}
+        <Text style={styles.value} allowFontScaling={false} numberOfLines={1}>
+          {loading ? '—' : value}
+        </Text>
+      </View>
+
       <Text style={styles.label} numberOfLines={1}>
         {label}
       </Text>
@@ -66,32 +66,23 @@ export const StatTile: React.FC<StatTileProps> = ({
 };
 
 const styles = StyleSheet.create({
-  /** Centred stack: icon, then the number, then the label. */
-  tile: {
+  segment: {
     flex: 1,
-    backgroundColor: theme.color.surface.card,
-    borderRadius: theme.radius.lg,
-    borderWidth: 1,
-    borderColor: theme.color.border.subtle,
-    paddingVertical: theme.space.xl,
+    paddingVertical: theme.space.lg,
     paddingHorizontal: theme.space.sm,
-    alignItems: 'center',
-    ...theme.shadow.sm,
   },
-  badge: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+  /** Icon and count sit on one baseline, centred together as a unit. */
+  valueRow: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: theme.space.md,
-    ...theme.shadow.sm,
+    gap: theme.space.sm,
   },
   value: {
     fontFamily: theme.font.bold,
-    fontSize: theme.type.display.fontSize,
-    lineHeight: theme.type.display.lineHeight,
-    letterSpacing: theme.type.display.letterSpacing,
+    fontSize: theme.type.h1.fontSize,
+    lineHeight: theme.type.h1.lineHeight,
+    letterSpacing: theme.type.h1.letterSpacing,
     color: theme.color.text.primary,
     fontVariant: ['tabular-nums'],
     includeFontPadding: false,

@@ -95,9 +95,16 @@ export const theme = {
 
     /** Reserved status colours. Always ship with an icon + label — never colour alone. */
     status: {
-      success: '#0D9488',
-      successSubtle: '#ECFDF9',
-      successOnDark: '#0FA396',
+      /**
+       * A true green for "completed", chosen by validator rather than by eye.
+       * The obvious greens fail against the brand red or the amber progress
+       * fill under colour-vision deficiency: #15803D sits at ΔE 3.9 vs the red,
+       * #16A34A at 4.6 vs the amber. #0BA06E is the greenest step that clears
+       * both the CVD floor (8.2) and 3:1 contrast on white.
+       */
+      success: '#0BA06E',
+      successSubtle: '#E9FBF4',
+      successOnDark: '#12C88A',
 
       warning: amber[600],
       warningSubtle: amber[50],

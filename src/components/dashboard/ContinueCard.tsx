@@ -41,6 +41,13 @@ export interface ContinueCardProps {
   width?: number;
   /** Hide the meter for discovery rails where nothing has been started. */
   showMeter?: boolean;
+  /**
+   * Artwork only — no title, meta or meter. Used by the "Fresh from Phil" rail,
+   * where the thumbnails are the content and stacked text made each tile tall
+   * and busy. Lock and play affordances still render over the image.
+   */
+  mediaOnly?: boolean;
+  height?: number;
 }
 
 export const ContinueCard: React.FC<ContinueCardProps> = ({
@@ -49,12 +56,15 @@ export const ContinueCard: React.FC<ContinueCardProps> = ({
   fallbackImage,
   width = 208,
   showMeter = true,
+  mediaOnly = false,
+  height,
 }) => {
   const source: ImageSourcePropType | undefined = item.imageUrl
     ? { uri: item.imageUrl }
     : fallbackImage;
 
-  const withMeter = showMeter && !item.locked;
+  const withMeter = showMeter && !mediaOnly && !item.locked;
+  const thumbHeight = height ?? (mediaOnly ? 116 : 104);
 
   return (
     <TouchableOpacity
@@ -66,7 +76,7 @@ export const ContinueCard: React.FC<ContinueCardProps> = ({
         item.locked ? 'Locked.' : `${Math.round(item.progress)} percent complete.`
       }`}
     >
-      <View style={styles.thumbWrap}>
+      <View style={[styles.thumbWrap, { height: thumbHeight }]}>
         {source ? (
           <Image source={source} style={styles.thumb} resizeMode="cover" />
         ) : (
@@ -87,20 +97,22 @@ export const ContinueCard: React.FC<ContinueCardProps> = ({
         )}
       </View>
 
-      <View style={[styles.body, withMeter && styles.bodyWithMeter]}>
-        <Text style={styles.title} numberOfLines={2}>
-          {item.title}
-        </Text>
-        {!!item.meta && (
-          <Text style={styles.meta} numberOfLines={1}>
-            {item.meta}
+      {!mediaOnly && (
+        <View style={[styles.body, withMeter && styles.bodyWithMeter]}>
+          <Text style={styles.title} numberOfLines={2}>
+            {item.title}
           </Text>
-        )}
+          {!!item.meta && (
+            <Text style={styles.meta} numberOfLines={1}>
+              {item.meta}
+            </Text>
+          )}
 
-        {withMeter && (
-          <LinearMeter progress={item.progress} height={4} showValue style={styles.meter} />
-        )}
-      </View>
+          {withMeter && (
+            <LinearMeter progress={item.progress} height={4} showValue style={styles.meter} />
+          )}
+        </View>
+      )}
     </TouchableOpacity>
   );
 };
@@ -108,14 +120,13 @@ export const ContinueCard: React.FC<ContinueCardProps> = ({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: theme.color.surface.card,
-    borderRadius: theme.radius.lg,
-    borderWidth: 1,
-    borderColor: theme.color.border.subtle,
+    borderRadius: 16,
     overflow: 'hidden',
-    ...theme.shadow.sm,
+    // Flat, like the Explore grid: no border and no elevation. Android's
+    // elevation shadow tracks the rounded corner so closely that it reads as a
+    // second outline just inside the real one.
   },
   thumbWrap: {
-    height: 104,
     backgroundColor: theme.color.neutral[200],
   },
   thumb: {

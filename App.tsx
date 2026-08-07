@@ -23,7 +23,10 @@ import Toast from 'react-native-toast-message';
 import { NetworkProvider } from './src/context/NetworkProvider';
 import { handleAnonymousPaywall } from './src/services/subscriptionService';
 
-export const navigationRef = createNavigationContainerRef();
+// Re-exported for existing imports; the ref itself now lives in its own module
+// so services can navigate without importing App (which would be circular).
+export { navigationRef } from './src/navigation/navigationRef';
+import { navigationRef } from './src/navigation/navigationRef';
 
 export function navigate(name: string, params?: any) {
   if (navigationRef?.isReady()) {
@@ -291,9 +294,14 @@ function App() {
 
 function AppInitializer() {
   const { setIsSubscribed, isLoggedIn } = useUser();
+  // Superwall keys/delegate kept for the day we re-enable it; see setupSuperwall.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const apiKey = Platform.OS === 'ios' ? 'pk_YCLi5PYWHkiRnHGj_e-f9' : 'pk_Ax-FuapKW-XxnHDuoTLoi';
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const delegate = useMemo(() => new MySuperwallDelegate(), []);
+  // Constructing this is what configures RevenueCat — do not remove.
   const purchaseController = useMemo(() => new RCPurchaseController(), []);
+  void purchaseController;
   const [paywallChecked, setPaywallChecked] = useState(false);
   const [purchaseTracked, setPurchaseTracked] = useState(false);
 
@@ -362,23 +370,17 @@ function AppInitializer() {
         return;
       }
 
-      console.log('❌ User NOT subscribed - showing paywall');
-      
-      // Show paywall for non-subscribed users
-      await handleAnonymousPaywall(
-        'app_launch',
-        async (productId) => {
-          // ✅ Purchase successful
-          console.log('✅ Anonymous purchase successful:', productId);
-          // Update subscription status
-          await hasActiveSubscription();
-        },
-        () => {
-          // User skipped or cancelled paywall
-          console.log('⚠️ User skipped paywall');
-        }
-      );
-      
+      console.log('❌ User NOT subscribed - dashboard will offer the trial');
+
+      // The Superwall-hosted 'app_launch' paywall used to auto-present here,
+      // covering the app before the member had seen anything. It also could not
+      // follow the app's design and never surfaced the Play Console free-trial
+      // offer, so nobody knew the first week was free.
+      //
+      // The offer now lives on the dashboard (TrialBanner) and on every locked
+      // item, both routing to our own PaywallScreen, which reads the trial
+      // straight from RevenueCat. Nothing auto-presents on launch.
+
       setPaywallChecked(true);
     } catch (error) {
       console.error('Error checking/showing paywall:', error);
@@ -388,20 +390,21 @@ function AppInitializer() {
 
   useEffect(() => {
     const setupSuperwall = async () => {
-      // Ensure configuration completes before proceeding
-      await Superwall.configure({
-        apiKey,
-        purchaseController,
-        completion: () => {
-          console.log('✅ Superwall initialized successfully');
-        },
-      });
-
-      await Superwall.shared.setDelegate(delegate);
-      await Superwall.shared.setLogLevel(LogLevel.Debug);
-
-      // Start RC -> Superwall subscription bridge
-      purchaseController.syncSubscriptionStatus();
+      // Superwall is deliberately NOT configured any more.
+      //
+      // Its dashboard campaign "Philross Low Tier" auto-presented a paywall on
+      // every app launch — before the member saw anything — and there is no SDK
+      // option to suppress an implicit placement. That paywall also pointed at a
+      // different product (`low`, base plans com-weekly/monthly/yearly-low) than
+      // the ones we sell, so it showed the wrong prices and no free trial.
+      //
+      // Purchases now run through our own PaywallScreen, which reads products
+      // and trial phases straight from RevenueCat. RCPurchaseController is still
+      // constructed because its constructor is what configures RevenueCat.
+      //
+      // To bring Superwall back: restore the configure call below and pause or
+      // retarget that campaign in the Superwall dashboard first.
+      console.log('ℹ️ Superwall disabled — using in-app PaywallScreen');
 
       // Initial entitlement check
       await hasActiveSubscription();
