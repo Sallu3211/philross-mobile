@@ -96,7 +96,11 @@ workflows:
           yarn install
       - name: Build debug APK
         script: |
-          cd android && ./gradlew assembleDebug
+          # The repo is authored on Windows, which does not carry the Unix
+          # execute bit. gradlew is now stored as 100755 in git, but this guards
+          # against it regressing to 100644 on a future Windows commit and
+          # failing the build with "./gradlew: Permission denied" (exit 126).
+          cd android && chmod +x ./gradlew && ./gradlew assembleDebug
     artifacts:
       - android/app/build/outputs/apk/debug/*.apk
     publishing:
