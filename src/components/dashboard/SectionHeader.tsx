@@ -5,6 +5,7 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { theme } from '../../theme';
+import { ChevronRight } from '../ui/icons';
 
 export interface SectionHeaderProps {
   title: string;
@@ -22,8 +23,14 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
 }) => (
   <View style={styles.row}>
     <View style={styles.textCol}>
-      <Text style={styles.title}>{title}</Text>
-      {!!caption && <Text style={styles.caption}>{caption}</Text>}
+      <Text style={styles.title} numberOfLines={1}>
+        {title}
+      </Text>
+      {!!caption && (
+        <Text style={styles.caption} numberOfLines={1}>
+          {caption}
+        </Text>
+      )}
     </View>
 
     {!!onPressAction && (
@@ -31,8 +38,10 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
         onPress={onPressAction}
         hitSlop={theme.hitSlop}
         accessibilityRole="button"
+        style={styles.action}
       >
-        <Text style={styles.action}>{actionLabel}</Text>
+        <Text style={styles.actionText}>{actionLabel}</Text>
+        <ChevronRight size={13} color={theme.color.brand.base} weight={2.2} />
       </TouchableOpacity>
     )}
   </View>
@@ -47,22 +56,28 @@ const styles = StyleSheet.create({
   },
   textCol: {
     flex: 1,
-    gap: 1,
   },
   title: {
-    fontFamily: theme.font.heading,
+    fontFamily: theme.font.semibold,
     fontSize: theme.type.h2.fontSize,
     lineHeight: theme.type.h2.lineHeight,
     letterSpacing: theme.type.h2.letterSpacing,
     color: theme.color.text.primary,
   },
   caption: {
-    fontFamily: theme.font.body,
+    fontFamily: theme.font.regular,
     fontSize: theme.type.caption.fontSize,
+    lineHeight: theme.type.caption.lineHeight,
     color: theme.color.text.muted,
+    marginTop: 1,
   },
   action: {
-    fontFamily: theme.font.bold,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  actionText: {
+    fontFamily: theme.font.semibold,
     fontSize: theme.type.bodySm.fontSize,
     color: theme.color.brand.base,
   },

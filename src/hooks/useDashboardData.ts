@@ -1,17 +1,21 @@
 /**
  * useDashboardData — aggregates everything the dashboard renders.
  *
+ * FIELD NAMES MATTER HERE. The API does not return `title`/`thumbnail`/`image`.
+ * Feed items carry `name` + `cropped_thumbnail_url` + `slug`; courses carry
+ * `title` + `cropped_thumbnail_url` + `slug` + `course_completed`. Guessing the
+ * generic names silently yields "Untitled" cards with no artwork, which is what
+ * the first version of this screen did.
+ *
  * ⚠️ PROGRESS DATA IS CURRENTLY LOCAL-ONLY
  * The backend exposes no GET endpoint for progress: `getVideoProgress` and
  * `getCourseProgress` in ApiHelper are stubs that return a hardcoded 0, and the
  * only write path is POST `course/{video_id}/video_watched/` — which currently
- * sends an empty body (its payload fields are commented out).
- *
- * So this hook reads the same EncryptedStorage keys the course screens already
- * write (`course_progress_{id}`). That makes the rings real rather than fake,
- * but it means progress does NOT survive a reinstall and does NOT sync across
- * devices. Once the API grows a real progress endpoint, replace
- * `readLocalCourseProgress` with that call — nothing else here needs to change.
+ * sends an empty body. So this hook reads the same EncryptedStorage keys the
+ * course screens already write (`course_progress_{id}`). Progress therefore
+ * does NOT survive a reinstall and does NOT sync across devices. Once the API
+ * grows a real progress endpoint, replace `readLocalCourseProgress` with that
+ * call — nothing else here needs to change.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -23,6 +27,9 @@ import type { ContinueItem } from '../components/dashboard/ContinueCard';
 /** Length of the introductory free period, in days. */
 export const FREE_TRIAL_DAYS = 7;
 
+/** How many feed posts the "Fresh from Phil" rail shows before "See all". */
+export const FEED_RAIL_COUNT = 4;
+
 export type PlanState = 'trial' | 'trial-expired' | 'subscribed' | 'free';
 
 export interface DashboardData {
@@ -30,14 +37,11 @@ export interface DashboardData {
   refreshing: boolean;
   error: string | null;
 
-  /** 0–100 across every enrolled course. */
   overallProgress: number;
   completedCount: number;
   totalCount: number;
 
-  /** Courses with progress > 0 and < 100, most advanced first. */
   continueItems: ContinueItem[];
-  /** Newest feed tutorials, for the "Fresh from Phil" rail. */
   feedItems: ContinueItem[];
 
   planState: PlanState;
@@ -70,6 +74,11 @@ function toPercent(value: unknown): number {
   return Math.min(Math.max(n, 0), 100);
 }
 
+/** Both feed and course items use the same `cropped_*` artwork fields. */
+function artworkOf(item: any): string | null {
+  return item?.cropped_thumbnail_url ?? item?.cropped_image_url ?? null;
+}
+
 async function readLocalCourseProgress(courseId: number | string): Promise<number> {
   try {
     const raw = await EncryptedStorage.getItem(`course_progress_${courseId}`);
@@ -93,25 +102,18 @@ async function readPlanState(): Promise<{ state: PlanState; daysLeft: number }> 
 
     if (active.length > 0) {
       const entitlement: any = active[0];
-      const isTrial = entitlement?.periodType === 'TRIAL';
-
-      if (isTrial && entitlement?.expirationDate) {
+      if (entitlement?.periodType === 'TRIAL' && entitlement?.expirationDate) {
         const msLeft = new Date(entitlement.expirationDate).getTime() - Date.now();
-        const daysLeft = Math.max(Math.ceil(msLeft / 86_400_000), 0);
-        return { state: 'trial', daysLeft };
+        return { state: 'trial', daysLeft: Math.max(Math.ceil(msLeft / 86_400_000), 0) };
       }
       return { state: 'subscribed', daysLeft: 0 };
     }
 
-    // No active entitlement. Did they ever have one? If so the trial lapsed.
     const everSubscribed =
       Object.keys(info?.entitlements?.all ?? {}).length > 0 ||
       (info?.allPurchaseDates && Object.keys(info.allPurchaseDates).length > 0);
 
-    return {
-      state: everSubscribed ? 'trial-expired' : 'free',
-      daysLeft: 0,
-    };
+    return { state: everSubscribed ? 'trial-expired' : 'free', daysLeft: 0 };
   } catch {
     return { state: 'free', daysLeft: 0 };
   }
@@ -140,7 +142,7 @@ export function useDashboardData(navigation: any): DashboardData {
       try {
         const [courseRes, feedRes, plan] = await Promise.all([
           getCourseList(navigation, { limit: 20 }).catch(() => null),
-          getFeedList(navigation, { limit: 10 }).catch(() => null),
+          getFeedList(navigation, { limit: 12 }).catch(() => null),
           readPlanState(),
         ]);
 
@@ -152,16 +154,17 @@ export function useDashboardData(navigation: any): DashboardData {
 
         const withProgress = await Promise.all(
           courses.map(async (c: any) => {
-            // Prefer a server-provided figure if the endpoint ever starts
-            // returning one; fall back to what we stored locally.
-            const apiPct = toPercent(c?.completion ?? c?.progress);
+            // `course_completed` is authoritative when the API sets it.
+            const apiPct = c?.course_completed
+              ? 100
+              : toPercent(c?.completion ?? c?.progress);
             const localPct = await readLocalCourseProgress(c?.id ?? c?.slug);
             return { course: c, progress: Math.max(apiPct, localPct) };
           }),
         );
 
         const enrolled = withProgress.filter(
-          x => x.course?.is_enrolled || x.progress > 0,
+          x => x.course?.is_enrolled || x.course?.course_completed || x.progress > 0,
         );
 
         const done = enrolled.filter(x => x.progress >= 100).length;
@@ -182,29 +185,28 @@ export function useDashboardData(navigation: any): DashboardData {
             .sort((a, b) => b.progress - a.progress)
             .slice(0, 8)
             .map(x => ({
-              id: x.course?.id ?? x.course?.slug,
-              title: x.course?.title ?? x.course?.name ?? 'Untitled course',
-              meta: x.course?.category?.name
-                ? `Course · ${x.course.category.name}`
-                : 'Course',
+              id: x.course?.id,
+              slug: x.course?.slug,
+              title: x.course?.title ?? 'Untitled course',
+              meta: x.course?.is_paid_course ? 'Premium course' : 'Course',
               progress: x.progress,
-              imageUrl:
-                x.course?.thumbnail ?? x.course?.image ?? x.course?.cover_image ?? null,
-              locked: false,
+              imageUrl: artworkOf(x.course),
+              locked: !!x.course?.is_locked,
             })),
         );
 
-        /* ── Feed → newest tutorials rail ─────────────────────────────────── */
+        /* ── Feed → "Fresh from Phil" rail ────────────────────────────────── */
         const feed = toArray(feedRes?.data ?? feedRes);
         setLockedCount(feed.filter((f: any) => f?.locked).length);
 
         setFeedItems(
-          feed.slice(0, 8).map((f: any) => ({
+          feed.slice(0, FEED_RAIL_COUNT).map((f: any) => ({
             id: f?.id,
-            title: f?.title ?? f?.name ?? 'Untitled',
-            meta: f?.workout_type?.name ?? f?.category?.name ?? 'Tutorial',
+            slug: f?.slug,
+            title: f?.name ?? f?.headline ?? 'Untitled',
+            meta: f?.feed_type ?? 'Tutorial',
             progress: 0,
-            imageUrl: f?.thumbnail ?? f?.image ?? f?.cover_image ?? null,
+            imageUrl: artworkOf(f),
             locked: !!f?.locked,
           })),
         );

@@ -4,6 +4,9 @@
  * A stat tile, not a one-bar bar chart: when the data is one current value the
  * right form is the number itself, set large, with a quiet label under it.
  * Three of these form the dashboard's KPI row.
+ *
+ * Fixed internal geometry (icon badge, then value, then label) so three tiles
+ * side by side align on every row regardless of label length.
  */
 
 import React from 'react';
@@ -15,15 +18,14 @@ import {
   ViewStyle,
 } from 'react-native';
 import { theme } from '../../theme';
+import { IconProps } from '../ui/icons';
 
 export interface StatTileProps {
   value: string | number;
   label: string;
-  /** Optional small glyph shown above the value. */
-  glyph?: string;
-  /** Tint for the glyph badge. Text always stays in text tokens. */
+  icon?: React.FC<IconProps>;
+  /** Solid fill for the icon badge. Text always stays in text tokens. */
   tint?: string;
-  tintBg?: string;
   onPress?: () => void;
   loading?: boolean;
   style?: ViewStyle;
@@ -32,9 +34,8 @@ export interface StatTileProps {
 export const StatTile: React.FC<StatTileProps> = ({
   value,
   label,
-  glyph,
+  icon: IconCmp,
   tint = theme.color.brand.base,
-  tintBg = theme.color.brand.subtle,
   onPress,
   loading = false,
   style,
@@ -49,17 +50,15 @@ export const StatTile: React.FC<StatTileProps> = ({
       accessibilityRole={onPress ? 'button' : undefined}
       accessibilityLabel={`${label}: ${value}`}
     >
-      {!!glyph && (
-        <View style={[styles.badge, { backgroundColor: tintBg }]}>
-          <Text style={[styles.glyph, { color: tint }]} allowFontScaling={false}>
-            {glyph}
-          </Text>
+      {!!IconCmp && (
+        <View style={[styles.badge, { backgroundColor: tint }]}>
+          <IconCmp size={16} color={theme.color.text.inverse} />
         </View>
       )}
       <Text style={styles.value} allowFontScaling={false} numberOfLines={1}>
         {loading ? '—' : value}
       </Text>
-      <Text style={styles.label} numberOfLines={2}>
+      <Text style={styles.label} numberOfLines={1}>
         {label}
       </Text>
     </Container>
@@ -67,41 +66,44 @@ export const StatTile: React.FC<StatTileProps> = ({
 };
 
 const styles = StyleSheet.create({
+  /** Centred stack: icon, then the number, then the label. */
   tile: {
     flex: 1,
     backgroundColor: theme.color.surface.card,
     borderRadius: theme.radius.lg,
     borderWidth: 1,
     borderColor: theme.color.border.subtle,
-    paddingVertical: theme.space.lg,
-    paddingHorizontal: theme.space.md,
-    gap: 2,
+    paddingVertical: theme.space.xl,
+    paddingHorizontal: theme.space.sm,
+    alignItems: 'center',
     ...theme.shadow.sm,
   },
   badge: {
-    width: 28,
-    height: 28,
-    borderRadius: theme.radius.sm,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: theme.space.sm,
-  },
-  glyph: {
-    fontSize: 14,
-    includeFontPadding: false,
+    marginBottom: theme.space.md,
+    ...theme.shadow.sm,
   },
   value: {
     fontFamily: theme.font.bold,
-    fontSize: theme.type.h1.fontSize,
-    letterSpacing: theme.type.h1.letterSpacing,
+    fontSize: theme.type.display.fontSize,
+    lineHeight: theme.type.display.lineHeight,
+    letterSpacing: theme.type.display.letterSpacing,
     color: theme.color.text.primary,
+    fontVariant: ['tabular-nums'],
     includeFontPadding: false,
+    textAlign: 'center',
   },
   label: {
-    fontFamily: theme.font.body,
+    fontFamily: theme.font.medium,
     fontSize: theme.type.caption.fontSize,
     lineHeight: theme.type.caption.lineHeight,
     color: theme.color.text.muted,
+    marginTop: 2,
+    textAlign: 'center',
   },
 });
 

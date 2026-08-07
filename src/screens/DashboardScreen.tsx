@@ -2,13 +2,17 @@
  * DashboardScreen — the member home screen.
  *
  * Layout order is deliberate, top to bottom:
- *   1. Greeting          — who you are, one tap to the menu
+ *   1. Greeting          — who you are, menu and profile
  *   2. Hero meter        — the one figure the screen leads with
- *   3. Trial banner      — only while the free week is running or lapsed
- *   4. KPI row           — three headline numbers, not three tiny charts
+ *   3. KPI row           — three headline counts, finishing the progress story
+ *   4. Trial banner      — only while the free week is offered, running or lapsed
  *   5. Continue          — resume what you already started (highest intent)
  *   6. Quick actions     — the six things members actually do
  *   7. New tutorials     — discovery, with lock state for non-members
+ *
+ * Horizontal rails bleed to the screen edge (negative margin + matching inset
+ * padding) so cards scroll off the edge rather than stopping at a gutter, which
+ * is what makes a rail read as scrollable.
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
@@ -24,7 +28,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import SideMenu from '../components/SideMenu';
-import MenuIcon from '../../assets/icons/menu.svg';
 import { useUser } from '../context/UserContext';
 import { theme } from '../theme';
 
@@ -35,6 +38,21 @@ import SectionHeader from '../components/dashboard/SectionHeader';
 import ContinueCard, { ContinueItem } from '../components/dashboard/ContinueCard';
 import QuickActions, { QuickAction } from '../components/dashboard/QuickActions';
 import { StatusTone } from '../components/ui/StatusChip';
+import {
+  Calendar,
+  Check,
+  Clock,
+  Coach,
+  Courses,
+  Gift,
+  Info,
+  InProgress,
+  Lock,
+  Menu,
+  Play,
+  Shop,
+  IconProps,
+} from '../components/ui/icons';
 
 import useDashboardData, { FREE_TRIAL_DAYS } from '../hooks/useDashboardData';
 import { checkSubscriptionAndProceed } from '../services/subscriptionService';
@@ -58,31 +76,34 @@ const DashboardScreen = ({ navigation }: any) => {
   );
 
   /** Everything paywalled routes through the existing Superwall/RevenueCat flow. */
-  const openPaywall = useCallback(
-    (onUnlocked?: () => void) => {
-      checkSubscriptionAndProceed(() => onUnlocked?.());
-    },
-    [],
-  );
+  const openPaywall = useCallback((onUnlocked?: () => void) => {
+    checkSubscriptionAndProceed(() => onUnlocked?.());
+  }, []);
 
-  const openItem = useCallback(
+  /** CourseDetails reads BOTH courseId and courseSlug from its route params. */
+  const openCourse = useCallback(
     (item: ContinueItem) => {
-      if (item.locked) {
-        openPaywall(() => navigation.navigate('FeedDetails', { id: item.id }));
-        return;
-      }
-      navigation.navigate('CourseDetails', { courseId: item.id });
+      navigation.navigate('CourseDetails', {
+        courseId: item.id,
+        courseSlug: item.slug,
+      });
     },
-    [navigation, openPaywall],
+    [navigation],
   );
 
+  /** FeedDetails routes by `feedSlug`, not by id. */
   const openFeedItem = useCallback(
     (item: ContinueItem) => {
+      const go = () =>
+        navigation.navigate('FeedDetails', {
+          feedSlug: item.slug,
+          sourceScreen: 'Dashboard',
+        });
       if (item.locked) {
-        openPaywall(() => navigation.navigate('FeedDetails', { id: item.id }));
+        openPaywall(go);
         return;
       }
-      navigation.navigate('FeedDetails', { id: item.id });
+      go();
     },
     [navigation, openPaywall],
   );
@@ -92,7 +113,7 @@ const DashboardScreen = ({ navigation }: any) => {
       {
         key: 'feed',
         label: 'Tutorials',
-        glyph: '▶',
+        icon: Play,
         tint: theme.color.brand.base,
         tintBg: theme.color.brand.subtle,
         onPress: () => navigation.navigate('Feed'),
@@ -100,7 +121,7 @@ const DashboardScreen = ({ navigation }: any) => {
       {
         key: 'courses',
         label: 'Courses',
-        glyph: '🎓',
+        icon: Courses,
         tint: theme.color.status.info,
         tintBg: theme.color.status.infoSubtle,
         badge: d.coursesInProgress > 0 ? `${d.coursesInProgress} active` : undefined,
@@ -109,7 +130,7 @@ const DashboardScreen = ({ navigation }: any) => {
       {
         key: 'coach',
         label: 'My Coach',
-        glyph: '🏋',
+        icon: Coach,
         tint: theme.color.status.success,
         tintBg: theme.color.status.successSubtle,
         onPress: () => navigation.navigate('MyCoach'),
@@ -117,23 +138,23 @@ const DashboardScreen = ({ navigation }: any) => {
       {
         key: 'events',
         label: 'Events',
-        glyph: '📅',
-        tint: theme.color.status.warning,
-        tintBg: theme.color.status.warningSubtle,
+        icon: Calendar,
+        tint: theme.color.progress.fill,
+        tintBg: theme.color.progress.subtle,
         onPress: () => navigation.navigate('Events'),
       },
       {
         key: 'shop',
-        label: 'Books & Gear',
-        glyph: '🛍',
+        label: 'Books',
+        icon: Shop,
         tint: theme.color.brand.base,
         tintBg: theme.color.brand.subtle,
         onPress: () => navigation.navigate('Products'),
       },
       {
         key: 'about',
-        label: 'About Phil',
-        glyph: 'ℹ',
+        label: 'About',
+        icon: Info,
         tint: theme.color.neutral[600],
         tintBg: theme.color.neutral[100],
         onPress: () => navigation.navigate('About'),
@@ -159,6 +180,15 @@ const DashboardScreen = ({ navigation }: any) => {
       : d.planState === 'trial-expired'
       ? 'brand'
       : 'neutral';
+
+  const planIcon: React.FC<IconProps> =
+    d.planState === 'trial'
+      ? Clock
+      : d.planState === 'subscribed'
+      ? Check
+      : d.planState === 'trial-expired'
+      ? Lock
+      : Gift;
 
   /**
    * Free tier + free trial run side by side, so the banner has three faces:
@@ -199,20 +229,26 @@ const DashboardScreen = ({ navigation }: any) => {
             accessibilityRole="button"
             accessibilityLabel="Open menu"
           >
-            <MenuIcon width={22} height={22} />
+            <Menu size={20} color={theme.color.text.primary} />
           </TouchableOpacity>
 
           <View style={styles.headerText}>
-            <Text style={styles.greeting}>{greetingFor(new Date())}</Text>
+            <Text style={styles.greeting} numberOfLines={1}>
+              {greetingFor(new Date())}
+            </Text>
             <Text style={styles.name} numberOfLines={1}>
               {firstName}
             </Text>
           </View>
 
+          {/* Same size and radius as the menu button so they read as a pair. */}
           <TouchableOpacity
             style={styles.avatar}
+            onPress={() => navigation.navigate('Profile')}
+            activeOpacity={0.8}
+            hitSlop={theme.hitSlop}
             accessibilityRole="button"
-            accessibilityLabel="Your profile"
+            accessibilityLabel="Profile and settings"
           >
             <Text style={styles.avatarText} allowFontScaling={false}>
               {getUserInitial()}
@@ -227,17 +263,46 @@ const DashboardScreen = ({ navigation }: any) => {
           progress={d.overallProgress}
           planLabel={planLabel}
           planTone={planTone}
+          planIcon={planIcon}
           completedCount={d.completedCount}
           totalCount={d.totalCount}
           subtitle={
             d.totalCount === 0
-              ? 'Start a course and your progress will show up here.'
+              ? 'Start a course and your progress shows up here.'
               : 'Keep going — consistency beats intensity.'
           }
           loading={d.loading}
         />
 
-        {/* 3 ── Trial */}
+        {/* 3 ── KPI row. Sits directly under the hero so the three counts read
+             as part of the progress story, before any sales messaging. */}
+        <View style={styles.kpiRow}>
+          <StatTile
+            value={d.completedCount}
+            label="Completed"
+            icon={Check}
+            tint={theme.color.status.success}
+            loading={d.loading}
+          />
+          <StatTile
+            value={d.coursesInProgress}
+            label="In progress"
+            icon={InProgress}
+            tint={theme.color.progress.fill}
+            loading={d.loading}
+            onPress={() => navigation.navigate('Courses')}
+          />
+          <StatTile
+            value={d.lockedCount}
+            label="Locked"
+            icon={Lock}
+            tint={theme.color.neutral[500]}
+            loading={d.loading}
+            onPress={() => openPaywall()}
+          />
+        </View>
+
+        {/* 4 ── Trial */}
         {trialMode && (
           <TrialBanner
             mode={trialMode}
@@ -246,36 +311,6 @@ const DashboardScreen = ({ navigation }: any) => {
             onPressCta={() => openPaywall()}
           />
         )}
-
-        {/* 4 ── KPI row */}
-        <View style={styles.kpiRow}>
-          <StatTile
-            value={d.completedCount}
-            label="Courses completed"
-            glyph="✓"
-            tint={theme.color.status.success}
-            tintBg={theme.color.status.successSubtle}
-            loading={d.loading}
-          />
-          <StatTile
-            value={d.coursesInProgress}
-            label="In progress"
-            glyph="◐"
-            tint={theme.color.brand.base}
-            tintBg={theme.color.brand.subtle}
-            loading={d.loading}
-            onPress={() => navigation.navigate('Courses')}
-          />
-          <StatTile
-            value={d.lockedCount}
-            label="Locked tutorials"
-            glyph="🔒"
-            tint={theme.color.neutral[600]}
-            tintBg={theme.color.neutral[100]}
-            loading={d.loading}
-            onPress={() => openPaywall()}
-          />
-        </View>
 
         {/* 5 ── Continue */}
         {d.continueItems.length > 0 && (
@@ -288,10 +323,11 @@ const DashboardScreen = ({ navigation }: any) => {
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
+              style={styles.railBleed}
               contentContainerStyle={styles.rail}
             >
               {d.continueItems.map(item => (
-                <ContinueCard key={String(item.id)} item={item} onPress={openItem} />
+                <ContinueCard key={String(item.id)} item={item} onPress={openCourse} />
               ))}
             </ScrollView>
           </View>
@@ -314,6 +350,7 @@ const DashboardScreen = ({ navigation }: any) => {
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
+              style={styles.railBleed}
               contentContainerStyle={styles.rail}
             >
               {d.feedItems.map(item => (
@@ -321,7 +358,8 @@ const DashboardScreen = ({ navigation }: any) => {
                   key={String(item.id)}
                   item={item}
                   onPress={openFeedItem}
-                  width={208}
+                  width={188}
+                  showMeter={false}
                 />
               ))}
             </ScrollView>
@@ -338,25 +376,27 @@ const DashboardScreen = ({ navigation }: any) => {
   );
 };
 
+const GUTTER = theme.space.screen;
+
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: theme.color.surface.app,
   },
   content: {
-    paddingHorizontal: theme.space.xl,
+    paddingHorizontal: GUTTER,
     paddingBottom: theme.space['5xl'],
-    gap: theme.space['2xl'],
+    gap: theme.space.section,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.space.md,
-    paddingTop: theme.space.md,
+    gap: theme.space.lg,
+    paddingTop: theme.space.sm,
   },
   menuBtn: {
-    width: theme.minTouch,
-    height: theme.minTouch,
+    width: 40,
+    height: 40,
     borderRadius: theme.radius.md,
     alignItems: 'center',
     justifyContent: 'center',
@@ -366,33 +406,38 @@ const styles = StyleSheet.create({
   },
   headerText: {
     flex: 1,
+    minWidth: 0,
   },
   greeting: {
-    fontFamily: theme.font.body,
-    fontSize: theme.type.bodySm.fontSize,
+    fontFamily: theme.font.regular,
+    fontSize: theme.type.caption.fontSize,
+    lineHeight: theme.type.caption.lineHeight,
     color: theme.color.text.muted,
   },
   name: {
-    fontFamily: theme.font.heading,
+    fontFamily: theme.font.bold,
     fontSize: theme.type.h2.fontSize,
     lineHeight: theme.type.h2.lineHeight,
+    letterSpacing: theme.type.h2.letterSpacing,
     color: theme.color.text.primary,
   },
   avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    // Matches menuBtn exactly — same box, same corner radius.
+    width: 40,
+    height: 40,
+    borderRadius: theme.radius.md,
     backgroundColor: theme.color.brand.base,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
     fontFamily: theme.font.bold,
-    fontSize: theme.type.h3.fontSize,
+    fontSize: theme.type.body.fontSize,
     color: theme.color.text.onBrand,
+    includeFontPadding: false,
   },
   error: {
-    fontFamily: theme.font.body,
+    fontFamily: theme.font.medium,
     fontSize: theme.type.bodySm.fontSize,
     color: theme.color.brand.base,
   },
@@ -403,9 +448,13 @@ const styles = StyleSheet.create({
   section: {
     gap: theme.space.lg,
   },
+  /** Let rails run to the physical screen edge. */
+  railBleed: {
+    marginHorizontal: -GUTTER,
+  },
   rail: {
     gap: theme.space.md,
-    paddingRight: theme.space.xs,
+    paddingHorizontal: GUTTER,
   },
 });
 

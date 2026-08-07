@@ -3,102 +3,128 @@
  *
  * Replaces the old "everything lives in the burger menu" pattern: the six things
  * a member actually does are one tap from the home screen.
+ *
+ * Widths are computed from the container rather than set as percentages, so the
+ * three columns land on exact pixels and the grid stays aligned on any screen
+ * size. Percentage widths plus a gap leave a ragged right edge.
  */
 
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  LayoutChangeEvent,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { theme } from '../../theme';
+import { IconProps } from '../ui/icons';
 
 export interface QuickAction {
   key: string;
   label: string;
-  glyph: string;
+  icon: React.FC<IconProps>;
   tint: string;
   tintBg: string;
-  /** Small count/state badge, e.g. "3 new". */
+  /** Small count/state badge, e.g. "2 active". */
   badge?: string;
   onPress: () => void;
 }
 
 export interface QuickActionsProps {
   actions: QuickAction[];
+  columns?: number;
 }
 
-export const QuickActions: React.FC<QuickActionsProps> = ({ actions }) => (
-  <View style={styles.grid}>
-    {actions.map(action => (
-      <TouchableOpacity
-        key={action.key}
-        style={styles.tile}
-        activeOpacity={0.85}
-        onPress={action.onPress}
-        accessibilityRole="button"
-        accessibilityLabel={action.label}
-      >
-        <View style={[styles.badge, { backgroundColor: action.tintBg }]}>
-          <Text style={[styles.glyph, { color: action.tint }]} allowFontScaling={false}>
-            {action.glyph}
-          </Text>
-        </View>
+export const QuickActions: React.FC<QuickActionsProps> = ({
+  actions,
+  columns = 3,
+}) => {
+  const [tileWidth, setTileWidth] = React.useState<number | null>(null);
+  const gap = theme.space.md;
 
-        <Text style={styles.label} numberOfLines={1}>
-          {action.label}
-        </Text>
+  const onLayout = (e: LayoutChangeEvent) => {
+    const total = e.nativeEvent.layout.width;
+    // Exact pixel width per column, so the last column ends flush with the edge.
+    setTileWidth((total - gap * (columns - 1)) / columns);
+  };
 
-        {!!action.badge && (
-          <Text style={styles.count} numberOfLines={1}>
-            {action.badge}
-          </Text>
-        )}
-      </TouchableOpacity>
-    ))}
-  </View>
-);
+  return (
+    <View style={[styles.grid, { gap }]} onLayout={onLayout}>
+      {actions.map(action => {
+        const IconCmp = action.icon;
+        return (
+          <TouchableOpacity
+            key={action.key}
+            style={[styles.tile, tileWidth ? { width: tileWidth } : styles.tileFallback]}
+            activeOpacity={0.85}
+            onPress={action.onPress}
+            accessibilityRole="button"
+            accessibilityLabel={action.label}
+          >
+            {/* Solid badge with a white knockout glyph — a filled shape holds
+                its weight at 19px far better than a tinted outline. */}
+            <View style={[styles.badge, { backgroundColor: action.tint }]}>
+              <IconCmp size={19} color={theme.color.text.inverse} />
+            </View>
+
+            <Text style={styles.label} numberOfLines={1}>
+              {action.label}
+            </Text>
+
+            <Text style={styles.count} numberOfLines={1}>
+              {action.badge ?? ' '}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: theme.space.md,
   },
   tile: {
-    // Three per row, accounting for the two 12pt gaps between them.
-    width: '31.2%',
-    minWidth: 96,
-    flexGrow: 1,
     backgroundColor: theme.color.surface.card,
     borderRadius: theme.radius.lg,
     borderWidth: 1,
     borderColor: theme.color.border.subtle,
     paddingVertical: theme.space.lg,
-    paddingHorizontal: theme.space.md,
+    paddingHorizontal: theme.space.sm,
     alignItems: 'center',
-    gap: theme.space.sm,
-    minHeight: 104,
     ...theme.shadow.sm,
   },
+  tileFallback: {
+    flexGrow: 1,
+    flexBasis: '30%',
+  },
   badge: {
-    width: 40,
-    height: 40,
+    width: 38,
+    height: 38,
     borderRadius: theme.radius.md,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  glyph: {
-    fontSize: 18,
-    includeFontPadding: false,
+    marginBottom: theme.space.md,
+    ...theme.shadow.sm,
   },
   label: {
-    fontFamily: theme.font.bold,
+    fontFamily: theme.font.semibold,
     fontSize: theme.type.caption.fontSize,
     color: theme.color.text.primary,
     textAlign: 'center',
+    includeFontPadding: false,
   },
   count: {
-    fontFamily: theme.font.body,
-    fontSize: 11,
+    fontFamily: theme.font.regular,
+    fontSize: theme.type.overline.fontSize,
+    lineHeight: theme.type.overline.lineHeight,
     color: theme.color.text.muted,
     textAlign: 'center',
+    marginTop: 2,
+    includeFontPadding: false,
   },
 });
 

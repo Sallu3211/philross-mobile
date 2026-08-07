@@ -1,8 +1,11 @@
 /**
  * ContinueCard — a resumable tutorial/course tile with its own progress meter.
  *
- * Locked items keep their thumbnail but gain a scrim, a lock glyph and the word
+ * Locked items keep their thumbnail but gain a scrim, a lock icon and the word
  * "Locked": the state is never carried by colour or dimming alone.
+ *
+ * The body is a fixed height so cards in a horizontal rail line up along their
+ * meters even when one title wraps to two lines and another does not.
  */
 
 import React from 'react';
@@ -16,11 +19,14 @@ import {
 } from 'react-native';
 import { theme } from '../../theme';
 import LinearMeter from '../ui/LinearMeter';
+import { Lock, Play } from '../ui/icons';
 
 export interface ContinueItem {
   id: string | number;
+  /** Required by both CourseDetails and FeedDetails, which route by slug. */
+  slug?: string;
   title: string;
-  /** e.g. "Course · Lesson 3 of 12" */
+  /** e.g. "Course · Strength" */
   meta?: string;
   /** 0–100 */
   progress: number;
@@ -33,19 +39,22 @@ export interface ContinueCardProps {
   onPress: (item: ContinueItem) => void;
   fallbackImage?: ImageSourcePropType;
   width?: number;
+  /** Hide the meter for discovery rails where nothing has been started. */
+  showMeter?: boolean;
 }
 
 export const ContinueCard: React.FC<ContinueCardProps> = ({
   item,
   onPress,
   fallbackImage,
-  width = 232,
+  width = 208,
+  showMeter = true,
 }) => {
   const source: ImageSourcePropType | undefined = item.imageUrl
     ? { uri: item.imageUrl }
     : fallbackImage;
 
-  const started = item.progress > 0;
+  const withMeter = showMeter && !item.locked;
 
   return (
     <TouchableOpacity
@@ -64,27 +73,21 @@ export const ContinueCard: React.FC<ContinueCardProps> = ({
           <View style={[styles.thumb, styles.thumbEmpty]} />
         )}
 
-        {item.locked && (
+        {item.locked ? (
           <View style={styles.scrim}>
             <View style={styles.lockPill}>
-              <Text style={styles.lockGlyph} allowFontScaling={false}>
-                🔒
-              </Text>
+              <Lock size={12} color={theme.color.text.inverse} weight={2.1} />
               <Text style={styles.lockText}>Locked</Text>
             </View>
           </View>
-        )}
-
-        {!item.locked && started && (
+        ) : (
           <View style={styles.playPill}>
-            <Text style={styles.playGlyph} allowFontScaling={false}>
-              ▶
-            </Text>
+            <Play size={12} color={theme.color.text.inverse} />
           </View>
         )}
       </View>
 
-      <View style={styles.body}>
+      <View style={[styles.body, withMeter && styles.bodyWithMeter]}>
         <Text style={styles.title} numberOfLines={2}>
           {item.title}
         </Text>
@@ -94,13 +97,8 @@ export const ContinueCard: React.FC<ContinueCardProps> = ({
           </Text>
         )}
 
-        {!item.locked && (
-          <LinearMeter
-            progress={item.progress}
-            height={5}
-            showValue
-            style={styles.meter}
-          />
+        {withMeter && (
+          <LinearMeter progress={item.progress} height={4} showValue style={styles.meter} />
         )}
       </View>
     </TouchableOpacity>
@@ -117,7 +115,7 @@ const styles = StyleSheet.create({
     ...theme.shadow.sm,
   },
   thumbWrap: {
-    height: 118,
+    height: 104,
     backgroundColor: theme.color.neutral[200],
   },
   thumb: {
@@ -137,52 +135,52 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
     borderRadius: theme.radius.pill,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-  },
-  lockGlyph: {
-    fontSize: 11,
+    backgroundColor: 'rgba(0,0,0,0.58)',
   },
   lockText: {
-    fontFamily: theme.font.bold,
+    fontFamily: theme.font.semibold,
     fontSize: theme.type.caption.fontSize,
     color: theme.color.text.inverse,
+    includeFontPadding: false,
   },
   playPill: {
     position: 'absolute',
-    right: theme.space.sm,
-    bottom: theme.space.sm,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    right: theme.space.md,
+    bottom: theme.space.md,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.58)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  playGlyph: {
-    fontSize: 11,
-    color: theme.color.text.inverse,
-    marginLeft: 2,
+    paddingLeft: 2,
   },
   body: {
-    padding: theme.space.md,
-    gap: 3,
+    padding: theme.space.lg,
+    // Fixed heights keep titles, metas and meters aligned across the rail.
+    height: 76,
+  },
+  bodyWithMeter: {
+    height: 96,
   },
   title: {
-    fontFamily: theme.font.bold,
+    fontFamily: theme.font.semibold,
     fontSize: theme.type.bodySm.fontSize,
     lineHeight: theme.type.bodySm.lineHeight,
+    letterSpacing: theme.type.bodySm.letterSpacing,
     color: theme.color.text.primary,
   },
   meta: {
-    fontFamily: theme.font.body,
+    fontFamily: theme.font.regular,
     fontSize: theme.type.caption.fontSize,
     color: theme.color.text.muted,
+    marginTop: 1,
   },
   meter: {
-    marginTop: theme.space.sm,
+    marginTop: 'auto',
   },
 });
 

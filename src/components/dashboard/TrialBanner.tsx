@@ -14,6 +14,7 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { theme } from '../../theme';
 import LinearMeter from '../ui/LinearMeter';
+import { Clock, Gift, Lock, IconProps } from '../ui/icons';
 
 export type TrialMode = 'available' | 'active' | 'expired';
 
@@ -28,16 +29,24 @@ export interface TrialBannerProps {
 
 const COPY: Record<
   TrialMode,
-  { glyph: string; title: (d: number) => string; body: string; cta: string }
+  {
+    icon: React.FC<IconProps>;
+    tint: string;
+    title: (d: number) => string;
+    body: string;
+    cta: string;
+  }
 > = {
   available: {
-    glyph: '🎁',
+    icon: Gift,
+    tint: theme.color.status.success,
     title: () => 'Your first week is on us',
     body: 'Unlock every tutorial, course and live event free for 7 days.',
     cta: 'Start my free week',
   },
   active: {
-    glyph: '⏳',
+    icon: Clock,
+    tint: theme.color.progress.fill,
     title: d =>
       d <= 0
         ? 'Last day of your free week'
@@ -46,7 +55,8 @@ const COPY: Record<
     cta: 'See membership options',
   },
   expired: {
-    glyph: '🔒',
+    icon: Lock,
+    tint: theme.color.brand.base,
     title: () => 'Your free week has ended',
     body: 'Subscribe to get your training, courses and certificates back.',
     cta: 'Reactivate access',
@@ -60,6 +70,7 @@ export const TrialBanner: React.FC<TrialBannerProps> = ({
   onPressCta,
 }) => {
   const copy = COPY[mode];
+  const IconCmp = copy.icon;
 
   const elapsed = Math.min(
     Math.max(trialLengthDays - daysLeft, 0),
@@ -67,20 +78,18 @@ export const TrialBanner: React.FC<TrialBannerProps> = ({
   );
   const elapsedPct = (elapsed / trialLengthDays) * 100;
 
-  const expired = mode === 'expired';
-
   return (
     <View
       style={[
         styles.card,
-        expired && styles.cardExpired,
+        mode === 'expired' && styles.cardExpired,
         mode === 'available' && styles.cardAvailable,
       ]}
     >
       <View style={styles.headRow}>
-        <Text style={styles.glyph} allowFontScaling={false}>
-          {copy.glyph}
-        </Text>
+        <View style={styles.iconWrap}>
+          <IconCmp size={17} color={copy.tint} weight={1.9} />
+        </View>
         <View style={styles.headText}>
           <Text style={styles.title} numberOfLines={2}>
             {copy.title(daysLeft)}
@@ -95,10 +104,9 @@ export const TrialBanner: React.FC<TrialBannerProps> = ({
       {mode === 'active' && (
         <LinearMeter
           progress={elapsedPct}
-          height={6}
-          color={theme.color.status.warning}
-          trackColor={theme.color.status.warningSubtle}
-          style={styles.meter}
+          height={5}
+          color={theme.color.progress.fill}
+          trackColor="rgba(255,255,255,0.65)"
         />
       )}
 
@@ -116,16 +124,16 @@ export const TrialBanner: React.FC<TrialBannerProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: theme.color.status.warningSubtle,
+    backgroundColor: theme.color.progress.subtle,
     borderRadius: theme.radius.xl,
     borderWidth: 1,
-    borderColor: 'rgba(194,133,26,0.28)',
+    borderColor: theme.color.progress.border,
     padding: theme.space.lg,
-    gap: theme.space.md,
+    gap: theme.space.lg,
   },
   cardAvailable: {
     backgroundColor: theme.color.status.successSubtle,
-    borderColor: 'rgba(13,148,136,0.28)',
+    borderColor: 'rgba(13,148,136,0.26)',
   },
   cardExpired: {
     backgroundColor: theme.color.brand.subtle,
@@ -133,42 +141,47 @@ const styles = StyleSheet.create({
   },
   headRow: {
     flexDirection: 'row',
-    gap: theme.space.md,
+    gap: theme.space.lg,
+    alignItems: 'flex-start',
   },
-  glyph: {
-    fontSize: 20,
-    marginTop: 1,
+  iconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: theme.radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // Translucent white lifts the icon off whichever tint the card is wearing.
+    backgroundColor: 'rgba(255,255,255,0.72)',
   },
   headText: {
     flex: 1,
     gap: 2,
   },
   title: {
-    fontFamily: theme.font.bold,
+    fontFamily: theme.font.semibold,
     fontSize: theme.type.body.fontSize,
     lineHeight: theme.type.body.lineHeight,
+    letterSpacing: theme.type.body.letterSpacing,
     color: theme.color.text.primary,
   },
   body: {
-    fontFamily: theme.font.body,
+    fontFamily: theme.font.regular,
     fontSize: theme.type.bodySm.fontSize,
     lineHeight: theme.type.bodySm.lineHeight,
     color: theme.color.text.secondary,
   },
-  meter: {
-    marginTop: 2,
-  },
   cta: {
     backgroundColor: theme.color.brand.base,
     borderRadius: theme.radius.md,
-    paddingVertical: theme.space.md,
+    paddingVertical: theme.space.lg,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: theme.minTouch,
   },
   ctaText: {
-    fontFamily: theme.font.bold,
+    fontFamily: theme.font.semibold,
     fontSize: theme.type.body.fontSize,
+    letterSpacing: 0.1,
     color: theme.color.text.onBrand,
   },
 });

@@ -21,7 +21,7 @@ export interface ProgressRingProps {
   progress: number;
   size?: number;
   strokeWidth?: number;
-  /** Fill colour. Defaults to the brand accent. */
+  /** Fill colour. Defaults to the amber progress ramp, not the brand red. */
   color?: string;
   /** Track colour. Defaults to the light step of the same hue. */
   trackColor?: string;
@@ -41,8 +41,8 @@ export const ProgressRing: React.FC<ProgressRingProps> = ({
   progress,
   size = 132,
   strokeWidth = 12,
-  color = theme.color.brand.base,
-  trackColor = theme.color.brand.track,
+  color = theme.color.progress.fill,
+  trackColor = theme.color.progress.track,
   label,
   caption,
   labelColor = theme.color.text.primary,
@@ -147,13 +147,13 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: theme.font.bold,
-    letterSpacing: -0.8,
+    letterSpacing: -1,
     includeFontPadding: false,
   },
   caption: {
-    fontFamily: theme.font.body,
+    fontFamily: theme.font.medium,
     fontSize: theme.type.caption.fontSize,
-    marginTop: 2,
+    marginTop: 1,
   },
 });
 

@@ -5,6 +5,7 @@ import SplashScreen from '../screens/SplashScreen';
 import LoginScreen from '../screens/LoginScreen';
 import SignUpScreen from '../screens/SignUpScreen';
 import DashboardScreen from '../screens/DashboardScreen';
+import ProfileScreen from '../screens/ProfileScreen';
 import FeedScreen from '../screens/FeedScreen';
 import VideoScreen from '../screens/VideoScreen';
 import EventsScreen from '../screens/EventsScreen';
@@ -48,6 +49,7 @@ const AppNavigator = () => {
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="SignUp" component={SignUpScreen} />
         <Stack.Screen name="Dashboard" component={DashboardScreen} />
+        <Stack.Screen name="Profile" component={ProfileScreen} />
         <Stack.Screen name="Feed" component={FeedScreen} />
         <Stack.Screen name="Video" component={VideoScreen} />
         <Stack.Screen name="Events" component={EventsScreen} />

@@ -1083,3 +1083,38 @@ export const deleteAccount = async (navigation: any) => {
         return { success: false, message: 'Failed to delete account.' };
     }
 };
+
+// Profile — read the signed-in user's details
+export const getProfile = async (navigation: any) => {
+    try {
+        const response = await apiCall({
+            endPoint: 'accounts/profile/',
+            method: 'GET',
+            navigation: navigation,
+        });
+        return response;
+    } catch (error) {
+        console.error('Get Profile Error:', error);
+        return { success: false, message: 'Failed to load your profile.' };
+    }
+};
+
+// Profile — update editable fields. PATCH so we only send what changed.
+export const updateProfile = async (
+    data: { first_name?: string; last_name?: string; full_name?: string },
+    navigation: any,
+) => {
+    try {
+        const response = await apiCall({
+            endPoint: 'accounts/profile/',
+            method: 'PATCH',
+            data: data,
+            navigation: navigation,
+            isMultipart: false,
+        });
+        return response;
+    } catch (error) {
+        console.error('Update Profile Error:', error);
+        return { success: false, message: 'Failed to update your profile.' };
+    }
+};

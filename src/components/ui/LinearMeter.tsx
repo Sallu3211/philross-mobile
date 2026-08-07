@@ -26,8 +26,8 @@ export interface LinearMeterProps {
 export const LinearMeter: React.FC<LinearMeterProps> = ({
   progress,
   height = 6,
-  color = theme.color.brand.base,
-  trackColor = theme.color.brand.track,
+  color = theme.color.progress.fill,
+  trackColor = theme.color.progress.track,
   showValue = false,
   valueColor = theme.color.text.secondary,
   animate = true,
@@ -84,7 +84,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.space.sm,
+    gap: theme.space.md,
   },
   track: {
     flex: 1,
@@ -94,10 +94,12 @@ const styles = StyleSheet.create({
     // Rounded data-end, anchored to the baseline at 0.
   },
   value: {
-    fontFamily: theme.font.bold,
+    fontFamily: theme.font.semibold,
     fontSize: theme.type.caption.fontSize,
-    minWidth: 34,
+    minWidth: 32,
     textAlign: 'right',
+    fontVariant: ['tabular-nums'],
+    includeFontPadding: false,
   },
 });
 
