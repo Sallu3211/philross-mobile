@@ -154,30 +154,55 @@ export function useDashboardData(navigation: any): DashboardData {
 
         const withProgress = await Promise.all(
           courses.map(async (c: any) => {
-            // `course_completed` is authoritative when the API sets it.
-            const apiPct = c?.course_completed
-              ? 100
-              : toPercent(c?.completion ?? c?.progress);
+            // ⚠️ `course_completed` is a PERCENTAGE STRING like "0 %", not a
+            // boolean. Treating it as a flag made every course read as 100%
+            // complete, because any non-empty string is truthy.
+            const apiPct = toPercent(
+              c?.course_completed ?? c?.completion ?? c?.progress,
+            );
             const localPct = await readLocalCourseProgress(c?.id ?? c?.slug);
             return { course: c, progress: Math.max(apiPct, localPct) };
           }),
         );
 
-        const enrolled = withProgress.filter(
-          x => x.course?.is_enrolled || x.course?.course_completed || x.progress > 0,
-        );
+        if (__DEV__) {
+          console.log(
+            '📊 DASHBOARD courses:',
+            JSON.stringify(
+              courses.map((c: any) => ({
+                id: c?.id,
+                title: c?.title,
+                is_enrolled: c?.is_enrolled,
+                course_completed: c?.course_completed,
+                completion: c?.completion,
+                progress: c?.progress,
+                total_videos: c?.total_videos,
+                watched_videos: c?.watched_videos,
+              })),
+              null,
+              1,
+            ),
+          );
+        }
 
-        const done = enrolled.filter(x => x.progress >= 100).length;
-        const inFlight = enrolled.filter(x => x.progress > 0 && x.progress < 100);
+        // The course endpoint returns no `is_enrolled` field, so "started" can
+        // only mean progress above zero. Before anyone has started anything the
+        // hero would read 0 of 0, which looks broken — so fall back to the full
+        // catalogue as the denominator: "0 of 6 complete" is true and useful.
+        const started = withProgress.filter(x => x.progress > 0);
+        const tracked = started.length > 0 ? started : withProgress;
+
+        const done = tracked.filter(x => x.progress >= 100).length;
+        const inFlight = tracked.filter(x => x.progress > 0 && x.progress < 100);
 
         const avg =
-          enrolled.length > 0
-            ? enrolled.reduce((sum, x) => sum + x.progress, 0) / enrolled.length
+          tracked.length > 0
+            ? tracked.reduce((sum, x) => sum + x.progress, 0) / tracked.length
             : 0;
 
         setOverallProgress(Math.round(avg));
         setCompletedCount(done);
-        setTotalCount(enrolled.length);
+        setTotalCount(tracked.length);
         setCoursesInProgress(inFlight.length);
 
         setContinueItems(

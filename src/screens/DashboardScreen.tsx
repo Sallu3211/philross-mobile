@@ -280,9 +280,11 @@ const DashboardScreen = ({ navigation }: any) => {
           completedCount={d.completedCount}
           totalCount={d.totalCount}
           subtitle={
-            d.totalCount === 0
+            // Keyed off whether anything is actually under way, not off the
+            // course count — the count now falls back to the whole catalogue.
+            d.completedCount === 0 && d.coursesInProgress === 0
               ? 'Start a course and your progress shows up here.'
-              : 'Keep going — consistency beats intensity.'
+              : 'Keep going. Consistency beats intensity.'
           }
           loading={d.loading}
         />

@@ -1,21 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Linking,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  Dimensions,
-  Platform,
-  Image,
-  Alert,
-  Linking,
-  ScrollView,
+  View,
 } from 'react-native';
-import { getFontFamily, getColors } from '../utils/platform';
-import EyeIcon from '../../assets/icons/Icons.svg';
+import { theme } from '../theme';
+import { Check, Eye, EyeOff, Lock, Mail, User } from '../components/ui/icons';
 import GoogleLogo from '../../assets/icons/google.png';
 import AppleLogo from '../../assets/icons/apple.png';
+// The current brand logo — same asset the splash screen uses.
+import PhilrossLogo from '../../assets/bootsplash/logo.png';
 import { signUp, socialAuthLogin } from '../../app/helpers/ApiHelper';
 import { useUser } from '../context/UserContext';
 import EncryptedStorage from 'react-native-encrypted-storage';
@@ -32,8 +36,6 @@ type AuthData = {
   email?: string;
   picture?: string;
 };
-const { width } = Dimensions.get('window');
-
 const SignUpScreen = ({ navigation }: any) => {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -43,8 +45,9 @@ const SignUpScreen = ({ navigation }: any) => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agreeToTerms, setAgreeToTerms] = useState(false);
   const [loader, setLoader] = useState(false);
+  /** Separate from `loader` so a social tap never makes the Sign up button busy. */
+  const [socialLoader, setSocialLoader] = useState<'google' | 'apple' | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{[key: string]: string}>({});
-  const colors = getColors();
   const { setUser } = useUser();
   const { isConnected } = useNetworkStatus();
 
@@ -274,7 +277,7 @@ const SignUpScreen = ({ navigation }: any) => {
     }
 
     try {
-      setLoader(true);
+      setSocialLoader(provider);
 
       let authData: AuthData | null = null;
 
@@ -334,382 +337,434 @@ const SignUpScreen = ({ navigation }: any) => {
       console.error(`Error during ${provider} authentication:`, error);
       Alert.alert('Error', `${provider.charAt(0).toUpperCase() + provider.slice(1)} authentication failed. Please try again.`);
     } finally {
-      setLoader(false);
+      setSocialLoader(null);
     }
   };
 
+  const busy = loader || socialLoader !== null;
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{paddingBottom: 50}}>
-      <View style={styles.header}>
-        <Text style={[styles.title, { fontFamily: getFontFamily('heading') }]}>Hi, Welcome</Text>
-        <Text style={[styles.subtitle, { fontFamily: getFontFamily('body') }]}>Join Master Phil's Fitness & Self-Defense Community</Text>
-      </View>
+    <KeyboardAvoidingView
+      style={styles.flex}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <StatusBar barStyle="light-content" backgroundColor={theme.color.surface.logoGround} />
 
-      <View style={styles.form}>
-        <View style={styles.inputGroup}>
-          <Text style={[styles.label, { fontFamily: getFontFamily('heading') }]}>Full Name</Text>
-          <TextInput
-            style={[
-              styles.input, 
-              { fontFamily: getFontFamily('body') },
-              fieldErrors.full_name && styles.inputError
-            ]}
-            placeholder="Phil Rose"
-            placeholderTextColor="#999"
-            value={fullName}
-            onChangeText={(text) => {
-              setFullName(text);
-              // Clear full_name error when user starts typing
-              if (fieldErrors.full_name) {
-                setFieldErrors(prev => ({ ...prev, full_name: '' }));
-              }
-            }}
-            autoCapitalize="words"
-          />
-          {fieldErrors.full_name && (
-            <Text style={styles.errorText}>{fieldErrors.full_name}</Text>
-          )}
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={[styles.label, { fontFamily: getFontFamily('heading') }]}>Email</Text>
-          <TextInput
-            style={[
-              styles.input, 
-              { fontFamily: getFontFamily('body') },
-              fieldErrors.email && styles.inputError
-            ]}
-            placeholder="phillrose123@gmail.com"
-            placeholderTextColor="#999"
-            value={email}
-            onChangeText={(text) => {
-              setEmail(text);
-              // Clear email error when user starts typing
-              if (fieldErrors.email) {
-                setFieldErrors(prev => ({ ...prev, email: '' }));
-              }
-            }}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-          {fieldErrors.email && (
-            <Text style={styles.errorText}>{fieldErrors.email}</Text>
-          )}
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={[styles.label, { fontFamily: getFontFamily('heading') }]}>Password</Text>
-          <View style={[styles.passwordContainer, fieldErrors.password && styles.passwordContainerError]}>
-            <TextInput
-              style={[
-                styles.passwordInput, 
-                { fontFamily: getFontFamily('body') },
-                fieldErrors.password && styles.inputError
-              ]}
-              placeholder="**************"
-              placeholderTextColor="#999"
-              value={password}
-              onChangeText={(text) => {
-                // Remove spaces from password
-                const cleanText = text.replace(/\s/g, '');
-                setPassword(cleanText);
-                // Clear password error when user starts typing
-                if (fieldErrors.password) {
-                  setFieldErrors(prev => ({ ...prev, password: '' }));
-                }
-              }}
-              secureTextEntry={!showPassword}
-            />
-            <TouchableOpacity
-              style={styles.eyeIcon}
-              onPress={() => setShowPassword(!showPassword)}
-            >
-              <EyeIcon width={22} height={22} />
-            </TouchableOpacity>
+      <ScrollView
+        style={styles.flex}
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
+        <View style={styles.masthead}>
+          <Image source={PhilrossLogo} style={styles.logo} resizeMode="contain" />
+          <View style={styles.mastheadText}>
+            <Text style={styles.title}>Create account</Text>
+            <Text style={styles.subtitle}>Start training with Master Phil.</Text>
           </View>
-          {fieldErrors.password && (
-            <Text style={styles.errorText}>{fieldErrors.password}</Text>
-          )}
         </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={[styles.label, { fontFamily: getFontFamily('heading') }]}>Confirm Password</Text>
-          <View style={[styles.passwordContainer, fieldErrors.confirm_password && styles.passwordContainerError]}>
-            <TextInput
-              style={[
-                styles.passwordInput, 
-                { fontFamily: getFontFamily('body') },
-                fieldErrors.confirm_password && styles.inputError
-              ]}
-              placeholder="**************"
-              placeholderTextColor="#999"
-              value={confirmPassword}
-              onChangeText={(text) => {
-                // Remove spaces from confirm password
-                const cleanText = text.replace(/\s/g, '');
-                setConfirmPassword(cleanText);
-                // Clear confirm_password error when user starts typing
-                if (fieldErrors.confirm_password) {
-                  setFieldErrors(prev => ({ ...prev, confirm_password: '' }));
-                }
-              }}
-              secureTextEntry={!showConfirmPassword}
-            />
-            <TouchableOpacity
-              style={styles.eyeIcon}
-              onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-            >
-              <EyeIcon width={22} height={22} />
-            </TouchableOpacity>
-          </View>
-          {fieldErrors.confirm_password && (
-            <Text style={styles.errorText}>{fieldErrors.confirm_password}</Text>
-          )}
-        </View>
-
-        <View style={styles.termsContainer}>
-          <TouchableOpacity
-            style={styles.checkboxContainer}
-            onPress={() => setAgreeToTerms(!agreeToTerms)}
-          >
-            <View style={[styles.checkbox, agreeToTerms && styles.checkboxChecked]}>
-              {agreeToTerms && <Text style={styles.checkmark}>✓</Text>}
+        <View style={styles.sheet}>
+          {/* Full name */}
+          <View style={styles.field}>
+            <Text style={styles.label}>Full name</Text>
+            <View style={[styles.inputWrap, fieldErrors.full_name && styles.inputWrapError]}>
+              <User size={17} color={theme.color.text.disabled} />
+              <TextInput
+                style={styles.input}
+                placeholder="Your name"
+                placeholderTextColor={theme.color.text.disabled}
+                value={fullName}
+                onChangeText={text => {
+                  setFullName(text);
+                  if (fieldErrors.full_name) {
+                    setFieldErrors(prev => ({ ...prev, full_name: '' }));
+                  }
+                }}
+                autoCapitalize="words"
+                returnKeyType="next"
+                editable={!busy}
+              />
             </View>
-            <Text style={[styles.termsText, { fontFamily: getFontFamily('body') }]}>
+            {!!fieldErrors.full_name && (
+              <Text style={styles.errorText}>{fieldErrors.full_name}</Text>
+            )}
+          </View>
+
+          {/* Email */}
+          <View style={styles.field}>
+            <Text style={styles.label}>Email</Text>
+            <View style={[styles.inputWrap, fieldErrors.email && styles.inputWrapError]}>
+              <Mail size={17} color={theme.color.text.disabled} />
+              <TextInput
+                style={styles.input}
+                placeholder="you@example.com"
+                placeholderTextColor={theme.color.text.disabled}
+                value={email}
+                onChangeText={text => {
+                  setEmail(text);
+                  if (fieldErrors.email) {
+                    setFieldErrors(prev => ({ ...prev, email: '' }));
+                  }
+                }}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoComplete="email"
+                returnKeyType="next"
+                editable={!busy}
+              />
+            </View>
+            {!!fieldErrors.email && <Text style={styles.errorText}>{fieldErrors.email}</Text>}
+          </View>
+
+          {/* Password */}
+          <View style={styles.field}>
+            <Text style={styles.label}>Password</Text>
+            <View style={[styles.inputWrap, fieldErrors.password && styles.inputWrapError]}>
+              <Lock size={17} color={theme.color.text.disabled} />
+              <TextInput
+                style={styles.input}
+                placeholder="At least 8 characters"
+                placeholderTextColor={theme.color.text.disabled}
+                value={password}
+                onChangeText={text => {
+                  setPassword(text.replace(/\s/g, ''));
+                  if (fieldErrors.password) {
+                    setFieldErrors(prev => ({ ...prev, password: '' }));
+                  }
+                }}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                returnKeyType="next"
+                editable={!busy}
+              />
+              <TouchableOpacity
+                onPress={() => setShowPassword(!showPassword)}
+                hitSlop={theme.hitSlop}
+                accessibilityRole="button"
+                accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? (
+                  <EyeOff size={18} color={theme.color.text.muted} />
+                ) : (
+                  <Eye size={18} color={theme.color.text.muted} />
+                )}
+              </TouchableOpacity>
+            </View>
+            {!!fieldErrors.password && (
+              <Text style={styles.errorText}>{fieldErrors.password}</Text>
+            )}
+          </View>
+
+          {/* Confirm password */}
+          <View style={styles.field}>
+            <Text style={styles.label}>Confirm password</Text>
+            <View
+              style={[
+                styles.inputWrap,
+                fieldErrors.confirm_password && styles.inputWrapError,
+              ]}
+            >
+              <Lock size={17} color={theme.color.text.disabled} />
+              <TextInput
+                style={styles.input}
+                placeholder="Re-enter your password"
+                placeholderTextColor={theme.color.text.disabled}
+                value={confirmPassword}
+                onChangeText={text => {
+                  setConfirmPassword(text.replace(/\s/g, ''));
+                  if (fieldErrors.confirm_password) {
+                    setFieldErrors(prev => ({ ...prev, confirm_password: '' }));
+                  }
+                }}
+                secureTextEntry={!showConfirmPassword}
+                autoCapitalize="none"
+                returnKeyType="done"
+                onSubmitEditing={handleSignUp}
+                editable={!busy}
+              />
+              <TouchableOpacity
+                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                hitSlop={theme.hitSlop}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  showConfirmPassword ? 'Hide password' : 'Show password'
+                }
+              >
+                {showConfirmPassword ? (
+                  <EyeOff size={18} color={theme.color.text.muted} />
+                ) : (
+                  <Eye size={18} color={theme.color.text.muted} />
+                )}
+              </TouchableOpacity>
+            </View>
+            {!!fieldErrors.confirm_password && (
+              <Text style={styles.errorText}>{fieldErrors.confirm_password}</Text>
+            )}
+          </View>
+
+          {/* Terms */}
+          <TouchableOpacity
+            style={styles.terms}
+            onPress={() => setAgreeToTerms(!agreeToTerms)}
+            activeOpacity={0.8}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: agreeToTerms }}
+          >
+            <View style={[styles.checkbox, agreeToTerms && styles.checkboxOn]}>
+              {agreeToTerms && <Check size={11} color={theme.color.text.inverse} />}
+            </View>
+            <Text style={styles.termsText}>
               I agree to the{' '}
-              <Text style={[styles.termsLink, { color: colors.primary }]} onPress={openTermsOfService}>Terms of Service</Text>
-              {' '}and{' '}
-              <Text style={[styles.termsLink, { color: colors.primary }]} onPress={openPrivacyPolicy}>Privacy Policy</Text>
+              <Text style={styles.termsLink} onPress={openTermsOfService}>
+                Terms of Service
+              </Text>{' '}
+              and{' '}
+              <Text style={styles.termsLink} onPress={openPrivacyPolicy}>
+                Privacy Policy
+              </Text>
             </Text>
           </TouchableOpacity>
-        </View>
 
-        <TouchableOpacity 
-          style={[
-            styles.signupButton, 
-            { backgroundColor: colors.primary },
-            loader && { opacity: 0.7 }
-          ]} 
-          onPress={handleSignUp}
-          disabled={loader}
-        >
-          <Text style={[styles.signupButtonText, { fontFamily: getFontFamily('bold') }]}>
-            {loader ? 'Creating Account...' : 'Sign Up'}
-          </Text>
-        </TouchableOpacity>
-
-        <View style={styles.divider}>
-          <View style={styles.dividerLine} />
-          <Text style={[styles.dividerText, { fontFamily: getFontFamily('body') }]}>Or sign up with</Text>
-          <View style={styles.dividerLine} />
-        </View>
-
-        <View style={styles.socialButtons}>
+          {/* Primary action */}
           <TouchableOpacity
-            style={styles.socialButton}
-            onPress={() => handleSocialAuth('google')}>
-            <Image source={GoogleLogo} style={{ width: 20, height: 20, marginRight: 8, backgroundColor: 'transparent' }} resizeMode="contain" />
-            <Text style={[styles.socialButtonText, { fontFamily: getFontFamily('body') }]}>Google</Text>
+            style={[styles.primaryBtn, busy && styles.btnDisabled]}
+            onPress={handleSignUp}
+            disabled={busy}
+            activeOpacity={0.9}
+            accessibilityRole="button"
+          >
+            {loader ? (
+              <ActivityIndicator color={theme.color.text.onBrand} />
+            ) : (
+              <Text style={styles.primaryBtnText}>Create account</Text>
+            )}
           </TouchableOpacity>
 
-          {Platform.OS === 'ios' && <TouchableOpacity
-            style={styles.socialButton}
-            onPress={() => handleSocialAuth('apple')}>
-            <Image source={AppleLogo} style={{ width: 22, height: 22, marginRight: 8, backgroundColor: 'transparent' }} resizeMode="contain" />
-            <Text style={[styles.socialButtonText, { fontFamily: getFontFamily('body') }]}>Apple</Text>
-          </TouchableOpacity>}
-        </View>
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or sign up with</Text>
+            <View style={styles.dividerLine} />
+          </View>
 
-        <View style={styles.signinContainer}>
-          <Text style={[styles.signinText, { fontFamily: getFontFamily('body') }]}>Already have an account? </Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-            <Text style={[styles.signinLink, { color: colors.primary, fontFamily: getFontFamily('bold') }]}>Sign In</Text>
-          </TouchableOpacity>
+          {/* Social */}
+          <View style={styles.socialCol}>
+            <TouchableOpacity
+              style={[styles.socialBtn, busy && styles.btnDisabled]}
+              onPress={() => handleSocialAuth('google')}
+              disabled={busy}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+            >
+              {socialLoader === 'google' ? (
+                <ActivityIndicator color={theme.color.text.primary} size="small" />
+              ) : (
+                <>
+                  <Image source={GoogleLogo} style={styles.socialLogo} />
+                  <Text style={styles.socialText}>Continue with Google</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            {Platform.OS === 'ios' && (
+              <TouchableOpacity
+                style={[styles.socialBtn, busy && styles.btnDisabled]}
+                onPress={() => handleSocialAuth('apple')}
+                disabled={busy}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+              >
+                {socialLoader === 'apple' ? (
+                  <ActivityIndicator color={theme.color.text.primary} size="small" />
+                ) : (
+                  <>
+                    <Image source={AppleLogo} style={styles.socialLogo} />
+                    <Text style={styles.socialText}>Continue with Apple</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>Already have an account? </Text>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Login')}
+              hitSlop={theme.hitSlop}
+            >
+              <Text style={styles.footerLink}>Log in</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 24,
+  flex: { flex: 1, backgroundColor: theme.color.surface.logoGround },
+  scroll: { flexGrow: 1 },
+
+  /** Logo and heading share one row — a lockup rather than a stack. */
+  masthead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space.lg,
+    backgroundColor: theme.color.surface.logoGround,
+    paddingHorizontal: theme.space['2xl'],
+    paddingTop: theme.space['2xl'],
+    paddingBottom: theme.space.xl,
   },
-  header: {
-    marginTop: Platform.OS === 'ios' ? 80 : 60,
-    marginBottom: 40,
+  logo: {
+    width: 58,
+    height: 58,
+    marginLeft: -4,
   },
+  mastheadText: { flex: 1, minWidth: 0 },
   title: {
-    fontSize: 24,
-    fontFamily: getFontFamily('heading'),
-    color: '#000000',
-    marginBottom: 8,
+    fontFamily: theme.font.bold,
+    // h1 rather than display: beside a 58px logo the larger step wraps.
+    fontSize: theme.type.h1.fontSize,
+    lineHeight: theme.type.h1.lineHeight,
+    letterSpacing: theme.type.h1.letterSpacing,
+    color: theme.color.text.inverse,
   },
   subtitle: {
-    fontSize: 14,
-    color: '#000000',
-    lineHeight: 20,
-  },
-  form: {
-    flex: 1,
-  },
-  inputGroup: {
-    marginBottom: 24,
-  },
-  label: {
-    fontSize: 14,
-    fontFamily: getFontFamily('heading'),
-    color: '#000000',
-    marginBottom: 8,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 14,
-    backgroundColor: '#FFFFFF',
-  },
-  inputError: {
-    borderColor: '#FF0000',
-    borderWidth: 2,
-  },
-  errorText: {
-    color: '#FF0000',
-    fontSize: 12,
-    marginTop: 4,
-  },
-  passwordContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-  },
-  passwordContainerError: {
-    borderColor: '#FF0000',
-    borderWidth: 2,
-  },
-  passwordInput: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 14,
-  },
-  eyeIcon: {
-    paddingHorizontal: 16,
-  },
-  eyeIconText: {
-    fontSize: 20,
-  },
-  termsContainer: {
-    marginBottom: 32,
-  },
-  checkboxContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderWidth: 2,
-    borderColor: '#3B82F6',
-    marginRight: 12,
-    marginTop: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkboxChecked: {
-    backgroundColor: '#3B82F6',
-  },
-  checkmark: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontFamily: getFontFamily('bold'),
-  },
-  termsText: {
-    fontSize: 14,
-    color: '#000000',
-    flex: 1,
-    lineHeight: 20,
-  },
-  termsLink: {
-    fontFamily: getFontFamily('heading'),
-  },
-  signupButton: {
-    borderRadius: 30,
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  signupButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontFamily: getFontFamily('bold'),
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#E0E0E0',
-  },
-  dividerText: {
-    marginHorizontal: 16,
-    color: '#999999',
-    fontSize: 12,
-  },
-  socialButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 40,
-  },
-  socialButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 20,
-    paddingVertical: 12,
-    marginHorizontal: 8,
-  },
-  googleIcon: {
-    fontSize: 20,
-    fontFamily: getFontFamily('bold'),
-    color: '#4285F4',
-    marginRight: 8,
-  },
-  appleIcon: {
-    fontSize: 20,
-    marginRight: 8,
-  },
-  socialButtonText: {
-    fontSize: 14,
-    color: '#000000',
-  },
-  signinContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  signinText: {
-    fontSize: 14,
-    color: '#000000',
-  },
-  signinLink: {
-    fontSize: 14,
-    fontFamily: getFontFamily('heading'),
+    fontFamily: theme.font.regular,
+    fontSize: theme.type.body.fontSize,
+    lineHeight: theme.type.body.lineHeight,
+    color: theme.color.text.inverseSecondary,
+    marginTop: theme.space.sm,
   },
 
+  sheet: {
+    flex: 1,
+    backgroundColor: theme.color.surface.app,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: theme.space['2xl'],
+    paddingTop: theme.space['2xl'],
+    paddingBottom: theme.space['3xl'],
+    gap: theme.space.lg,
+  },
+
+  field: { gap: theme.space.sm },
+  label: {
+    fontFamily: theme.font.semibold,
+    fontSize: theme.type.caption.fontSize,
+    color: theme.color.text.secondary,
+  },
+  inputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space.md,
+    backgroundColor: theme.color.surface.card,
+    borderRadius: theme.radius.md,
+    borderWidth: 1.5,
+    borderColor: theme.color.border.subtle,
+    paddingHorizontal: theme.space.lg,
+    minHeight: 52,
+  },
+  inputWrapError: { borderColor: theme.color.brand.base },
+  input: {
+    flex: 1,
+    fontFamily: theme.font.medium,
+    fontSize: theme.type.body.fontSize,
+    color: theme.color.text.primary,
+    paddingVertical: theme.space.md,
+  },
+  errorText: {
+    fontFamily: theme.font.medium,
+    fontSize: theme.type.caption.fontSize,
+    color: theme.color.brand.base,
+  },
+
+  terms: { flexDirection: 'row', alignItems: 'flex-start', gap: theme.space.md },
+  checkbox: {
+    width: 19,
+    height: 19,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    borderColor: theme.color.border.default,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  checkboxOn: {
+    backgroundColor: theme.color.brand.base,
+    borderColor: theme.color.brand.base,
+  },
+  termsText: {
+    flex: 1,
+    fontFamily: theme.font.regular,
+    fontSize: theme.type.bodySm.fontSize,
+    lineHeight: 19,
+    color: theme.color.text.secondary,
+  },
+  termsLink: {
+    fontFamily: theme.font.semibold,
+    color: theme.color.brand.base,
+  },
+
+  primaryBtn: {
+    backgroundColor: theme.color.brand.base,
+    borderRadius: theme.radius.md,
+    minHeight: 54,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: theme.space.xs,
+  },
+  btnDisabled: { opacity: 0.5 },
+  primaryBtnText: {
+    fontFamily: theme.font.semibold,
+    fontSize: theme.type.h3.fontSize,
+    color: theme.color.text.onBrand,
+  },
+
+  divider: { flexDirection: 'row', alignItems: 'center', gap: theme.space.lg },
+  dividerLine: { flex: 1, height: 1, backgroundColor: theme.color.border.subtle },
+  dividerText: {
+    fontFamily: theme.font.medium,
+    fontSize: theme.type.caption.fontSize,
+    color: theme.color.text.muted,
+  },
+
+  socialCol: { gap: theme.space.md },
+  socialBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.space.md,
+    backgroundColor: theme.color.surface.card,
+    borderRadius: theme.radius.md,
+    borderWidth: 1.5,
+    borderColor: theme.color.border.subtle,
+    minHeight: 52,
+  },
+  socialLogo: { width: 19, height: 19 },
+  socialText: {
+    fontFamily: theme.font.semibold,
+    fontSize: theme.type.body.fontSize,
+    color: theme.color.text.primary,
+  },
+
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: theme.space.sm,
+  },
+  footerText: {
+    fontFamily: theme.font.regular,
+    fontSize: theme.type.bodySm.fontSize,
+    color: theme.color.text.secondary,
+  },
+  footerLink: {
+    fontFamily: theme.font.bold,
+    fontSize: theme.type.bodySm.fontSize,
+    color: theme.color.brand.base,
+  },
 });
 
 export default SignUpScreen;

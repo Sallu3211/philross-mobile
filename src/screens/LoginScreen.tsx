@@ -1,23 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  Dimensions,
-  Platform,
-  Image,
-  Alert,
+  View,
 } from 'react-native';
 import EncryptedStorage from 'react-native-encrypted-storage';
-import { getFontFamily, getColors } from '../utils/platform';
-import EyeIcon from '../../assets/icons/Icons.svg';
+import { theme } from '../theme';
+import { Check, Eye, EyeOff, Lock, Mail } from '../components/ui/icons';
 import googleImage from '../../assets/icons/google.png';
 import appleImage from '../../assets/icons/apple.png';
+// The current brand logo — same asset the splash screen uses, so login matches
+// what people see at launch. assets/icons/*.png still hold the pre-rebrand mark.
+import PhilrossLogo from '../../assets/bootsplash/logo.png';
 import { useUser } from '../context/UserContext';
 import { login, socialAuthLogin } from '../../app/helpers/ApiHelper';
-import Utils from '../../app/helpers/Utilities';
 import { onUserLoginCleverTap } from '../../App';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import Toast from 'react-native-toast-message';
@@ -34,18 +39,21 @@ type AuthData = {
   picture?: string;
 };
 
-const { width } = Dimensions.get('window');
-
 const LoginScreen = ({ navigation, route }: any) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [loader, setLoader] = useState(false);
+  /**
+   * Tracked separately from `loader`. Both flows used to share one flag, so
+   * tapping "Continue with Google" flipped the email Log In button to
+   * "Logging In..." — the wrong button appeared busy.
+   */
+  const [socialLoader, setSocialLoader] = useState<'google' | 'apple' | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{[key: string]: string}>({});
   const [hasPendingPurchase, setHasPendingPurchase] = useState(false);
   
-  const colors = getColors();
   const { setUser } = useUser();
   const { isConnected } = useNetworkStatus();
 
@@ -308,7 +316,7 @@ const LoginScreen = ({ navigation, route }: any) => {
     }
 
     try {
-      setLoader(true);
+      setSocialLoader(provider);
 
       let authData: AuthData | null = null;
 
@@ -387,340 +395,369 @@ const LoginScreen = ({ navigation, route }: any) => {
       console.error(`Error during ${provider} authentication:`, error);
       Alert.alert('Error', `${provider.charAt(0).toUpperCase() + provider.slice(1)} authentication failed. Please try again.`);
     } finally {
-      setLoader(false);
+      setSocialLoader(null);
     }
   };
 
+  const busy = loader || socialLoader !== null;
+
   return (
-    <View style={styles.container}>
-      {/* {hasPendingPurchase && (
-        <View style={styles.premiumBanner}>
-          <Text style={styles.premiumBannerText}>
-            🎉 You have a premium purchase! Login to activate it.
-          </Text>
-        </View>
-      )} */}
+    <KeyboardAvoidingView
+      style={styles.flex}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <StatusBar barStyle="light-content" backgroundColor={theme.color.surface.logoGround} />
 
-      <View style={styles.header}>
-        <Text style={[styles.title, { fontFamily: getFontFamily('heading') }]}>Welcome Back</Text>
-        <Text style={[styles.subtitle, { fontFamily: getFontFamily('body') }]}>Your Strength Journey Awaits.</Text>
-      </View>
-
-      <View style={styles.form}>
-        <View style={styles.inputGroup}>
-          <Text style={[styles.label, { fontFamily: getFontFamily('heading') }]}>Email</Text>
-          <TextInput
-            style={[
-              styles.input, 
-              { fontFamily: getFontFamily('body') },
-              fieldErrors.email && styles.inputError
-            ]}
-            placeholder="phillrose123@gmail.com"
-            placeholderTextColor="#999"
-            value={email}
-            onChangeText={(text) => {
-              setEmail(text);
-              // Clear email error when user starts typing
-              if (fieldErrors.email) {
-                setFieldErrors(prev => ({ ...prev, email: '' }));
-              }
-            }}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-          {fieldErrors.email && (
-            <Text style={styles.errorText}>{fieldErrors.email}</Text>
-          )}
+      <ScrollView
+        style={styles.flex}
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
+        {/* Dark masthead — the logo needs a dark ground, and it separates the
+            brand from the form so the form reads as the thing to act on. */}
+        <View style={styles.masthead}>
+          <Image source={PhilrossLogo} style={styles.logo} resizeMode="contain" />
+          <View style={styles.mastheadText}>
+            <Text style={styles.title}>Welcome back</Text>
+            <Text style={styles.subtitle}>Your strength journey awaits.</Text>
+          </View>
         </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={[styles.label, { fontFamily: getFontFamily('heading') }]}>Password</Text>
-          <View style={[styles.passwordContainer, fieldErrors.password && styles.passwordContainerError]}>
-            <TextInput
-              style={[
-                styles.passwordInput, 
-                { fontFamily: getFontFamily('body') },
-                fieldErrors.password && styles.inputError
-              ]}
-              placeholder="**************"
-              placeholderTextColor="#999"
-              value={password}
-              onChangeText={(text) => {
-                // Remove spaces from password
-                const cleanText = text.replace(/\s/g, '');
-                setPassword(cleanText);
-                // Clear password error when user starts typing
-                if (fieldErrors.password) {
-                  setFieldErrors(prev => ({ ...prev, password: '' }));
-                }
-              }}
-              secureTextEntry={!showPassword}
-            />
+        <View style={styles.sheet}>
+          {/* Email */}
+          <View style={styles.field}>
+            <Text style={styles.label}>Email</Text>
+            <View style={[styles.inputWrap, fieldErrors.email && styles.inputWrapError]}>
+              <Mail size={17} color={theme.color.text.disabled} />
+              <TextInput
+                style={styles.input}
+                placeholder="you@example.com"
+                placeholderTextColor={theme.color.text.disabled}
+                value={email}
+                onChangeText={text => {
+                  setEmail(text);
+                  if (fieldErrors.email) {
+                    setFieldErrors(prev => ({ ...prev, email: '' }));
+                  }
+                }}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoComplete="email"
+                returnKeyType="next"
+                editable={!busy}
+              />
+            </View>
+            {!!fieldErrors.email && <Text style={styles.errorText}>{fieldErrors.email}</Text>}
+          </View>
+
+          {/* Password */}
+          <View style={styles.field}>
+            <Text style={styles.label}>Password</Text>
+            <View style={[styles.inputWrap, fieldErrors.password && styles.inputWrapError]}>
+              <Lock size={17} color={theme.color.text.disabled} />
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your password"
+                placeholderTextColor={theme.color.text.disabled}
+                value={password}
+                onChangeText={text => {
+                  setPassword(text.replace(/\s/g, ''));
+                  if (fieldErrors.password) {
+                    setFieldErrors(prev => ({ ...prev, password: '' }));
+                  }
+                }}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                returnKeyType="done"
+                onSubmitEditing={handleLogin}
+                editable={!busy}
+              />
+              <TouchableOpacity
+                onPress={() => setShowPassword(!showPassword)}
+                hitSlop={theme.hitSlop}
+                accessibilityRole="button"
+                accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? (
+                  <EyeOff size={18} color={theme.color.text.muted} />
+                ) : (
+                  <Eye size={18} color={theme.color.text.muted} />
+                )}
+              </TouchableOpacity>
+            </View>
+            {!!fieldErrors.password && (
+              <Text style={styles.errorText}>{fieldErrors.password}</Text>
+            )}
+          </View>
+
+          {/* Remember me + forgot */}
+          <View style={styles.optionsRow}>
             <TouchableOpacity
-              style={styles.eyeIcon}
-              onPress={() => setShowPassword(!showPassword)}
+              style={styles.remember}
+              onPress={() => setRememberMe(!rememberMe)}
+              hitSlop={theme.hitSlop}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: rememberMe }}
             >
-              <EyeIcon width={22} height={22} />
+              <View style={[styles.checkbox, rememberMe && styles.checkboxOn]}>
+                {rememberMe && <Check size={11} color={theme.color.text.inverse} />}
+              </View>
+              <Text style={styles.rememberText}>Remember me</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => navigation.navigate('ForgotPassword')}
+              hitSlop={theme.hitSlop}
+            >
+              <Text style={styles.forgot}>Forgot password?</Text>
             </TouchableOpacity>
           </View>
-          {fieldErrors.password && (
-            <Text style={styles.errorText}>{fieldErrors.password}</Text>
-          )}
-        </View>
 
-        <View style={styles.optionsRow}>
+          {/* Primary action */}
           <TouchableOpacity
-            style={styles.checkboxContainer}
-            onPress={() => setRememberMe(!rememberMe)}
+            style={[styles.primaryBtn, busy && styles.btnDisabled]}
+            onPress={handleLogin}
+            disabled={busy}
+            activeOpacity={0.9}
+            accessibilityRole="button"
           >
-            <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
-              {rememberMe && <Text style={styles.checkmark}>✓</Text>}
-            </View>
-            <Text style={[styles.checkboxText, { fontFamily: getFontFamily('body') }]}>Remember me</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')}>
-            <Text style={[styles.forgotPassword, { fontFamily: getFontFamily('body') }]}>Forgot Password?</Text>
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity 
-          style={[
-            styles.loginButton, 
-            { backgroundColor: colors.primary },
-            loader && { opacity: 0.7 }
-          ]} 
-          onPress={handleLogin}
-          disabled={loader}
-        >
-          <Text style={[styles.loginButtonText, { fontFamily: getFontFamily('bold') }]}>
-            {loader ? 'Logging In...' : 'Log In'}
-          </Text>
-        </TouchableOpacity>
-
-        <View style={styles.divider}>
-          <View style={styles.dividerLine} />
-          <Text style={[styles.dividerText, { fontFamily: getFontFamily('body') }]}>Or login with</Text>
-          <View style={styles.dividerLine} />
-        </View>
-
-        <View style={styles.socialButtons}>
-          <TouchableOpacity
-            style={styles.socialButton}
-            onPress={() => handleSocialAuth('google')}>
-            <Image source={googleImage} style={{ width: 20, height: 20, marginRight: 8, backgroundColor: 'transparent' }} />
-            <Text style={[styles.socialButtonText, { fontFamily: getFontFamily('body') }]}>Google</Text>
+            {loader ? (
+              <ActivityIndicator color={theme.color.text.onBrand} />
+            ) : (
+              <Text style={styles.primaryBtnText}>Log in</Text>
+            )}
           </TouchableOpacity>
 
-          {Platform.OS === 'ios' && <TouchableOpacity
-            style={styles.socialButton}
-            onPress={() => handleSocialAuth('apple')} >
-            <Image source={appleImage} style={{ width: 22, height: 22, marginRight: 8, backgroundColor: 'transparent' }} />
-            <Text style={[styles.socialButtonText, { fontFamily: getFontFamily('body') }]}>Apple</Text>
-          </TouchableOpacity>}
-        </View>
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or continue with</Text>
+            <View style={styles.dividerLine} />
+          </View>
 
-        <View style={styles.signupContainer}>
-          <Text style={[styles.signupText, { fontFamily: getFontFamily('body') }]}>Don't have an account? </Text>
-          <TouchableOpacity onPress={() => navigation.navigate('SignUp')}>
-            <Text style={[styles.signupLink, { color: colors.primary, fontFamily: getFontFamily('bold') }]}>Sign Up</Text>
-          </TouchableOpacity>
+          {/* Social */}
+          <View style={styles.socialCol}>
+            <TouchableOpacity
+              style={[styles.socialBtn, busy && styles.btnDisabled]}
+              onPress={() => handleSocialAuth('google')}
+              disabled={busy}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+            >
+              {socialLoader === 'google' ? (
+                <ActivityIndicator color={theme.color.text.primary} size="small" />
+              ) : (
+                <>
+                  <Image source={googleImage} style={styles.socialLogo} />
+                  <Text style={styles.socialText}>Continue with Google</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            {Platform.OS === 'ios' && (
+              <TouchableOpacity
+                style={[styles.socialBtn, busy && styles.btnDisabled]}
+                onPress={() => handleSocialAuth('apple')}
+                disabled={busy}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+              >
+                {socialLoader === 'apple' ? (
+                  <ActivityIndicator color={theme.color.text.primary} size="small" />
+                ) : (
+                  <>
+                    <Image source={appleImage} style={styles.socialLogo} />
+                    <Text style={styles.socialText}>Continue with Apple</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>Don't have an account? </Text>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('SignUp')}
+              hitSlop={theme.hitSlop}
+            >
+              <Text style={styles.footerLink}>Sign up</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
-    </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 24,
+  flex: { flex: 1, backgroundColor: theme.color.surface.logoGround },
+  scroll: { flexGrow: 1 },
+
+  /** Logo and greeting share one row — a lockup rather than a stack. */
+  masthead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space.lg,
+    backgroundColor: theme.color.surface.logoGround,
+    paddingHorizontal: theme.space['2xl'],
+    // Login has only two fields, so without a taller masthead the sheet ends
+    // well short of the bottom and the screen reads half-empty.
+    paddingTop: 65,
+    paddingBottom: theme.space['3xl'],
   },
-  premiumBanner: {
-    backgroundColor: '#4CAF50',
-    padding: 15,
-    borderRadius: 8,
-    marginTop: Platform.OS === 'ios' ? 60 : 40,
-    marginBottom: 10,
+  logo: {
+    width: 58,
+    height: 58,
+    marginLeft: -4, // optical alignment: the artwork carries its own padding
   },
-  premiumBannerText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    fontFamily: getFontFamily('bold'),
-  },
-  header: {
-    marginTop: Platform.OS === 'ios' ? 80 : 60,
-    marginBottom: 40,
-  },
+  mastheadText: { flex: 1, minWidth: 0 },
   title: {
-    fontSize: 24,
-    color: '#000000',
-    marginBottom: 8,
+    fontFamily: theme.font.bold,
+    // h1 rather than display: beside a 58px logo the larger step wraps.
+    fontSize: theme.type.h1.fontSize,
+    lineHeight: theme.type.h1.lineHeight,
+    letterSpacing: theme.type.h1.letterSpacing,
+    color: theme.color.text.inverse,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#000000',
+    fontFamily: theme.font.regular,
+    fontSize: theme.type.body.fontSize,
+    lineHeight: theme.type.body.lineHeight,
+    color: theme.color.text.inverseSecondary,
+    marginTop: theme.space.sm,
   },
-  form: {
+
+  /** White sheet lifted over the dark masthead. */
+  sheet: {
     flex: 1,
+    backgroundColor: theme.color.surface.app,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: theme.space['2xl'],
+    paddingTop: theme.space['3xl'],
+    paddingBottom: theme.space['4xl'],
+    gap: theme.space.xl,
   },
-  inputGroup: {
-    marginBottom: 24,
-  },
+
+  field: { gap: theme.space.sm },
   label: {
-    fontSize: 16,
-    fontFamily: getFontFamily('heading'),
-    color: '#000000',
-    marginBottom: 8,
+    fontFamily: theme.font.semibold,
+    fontSize: theme.type.caption.fontSize,
+    color: theme.color.text.secondary,
   },
+  inputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space.md,
+    backgroundColor: theme.color.surface.card,
+    borderRadius: theme.radius.md,
+    borderWidth: 1.5,
+    borderColor: theme.color.border.subtle,
+    paddingHorizontal: theme.space.lg,
+    minHeight: 52,
+  },
+  inputWrapError: { borderColor: theme.color.brand.base },
   input: {
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    backgroundColor: '#FFFFFF',
-  },
-  inputError: {
-    borderColor: '#B62020',
-    borderWidth: 2,
+    flex: 1,
+    fontFamily: theme.font.medium,
+    fontSize: theme.type.body.fontSize,
+    color: theme.color.text.primary,
+    paddingVertical: theme.space.md,
   },
   errorText: {
-    color: '#B62020',
-    fontSize: 12,
-    marginTop: 4,
+    fontFamily: theme.font.medium,
+    fontSize: theme.type.caption.fontSize,
+    color: theme.color.brand.base,
   },
-  passwordContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-  },
-  passwordContainerError: {
-    borderColor: '#B62020',
-    borderWidth: 2,
-  },
-  passwordInput: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-  },
-  eyeIcon: {
-    paddingHorizontal: 16,
-  },
-  eyeIconText: {
-    fontSize: 20,
-  },
+
   optionsRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 32,
+    marginTop: -theme.space.xs,
   },
-  checkboxContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
+  remember: { flexDirection: 'row', alignItems: 'center', gap: theme.space.md },
   checkbox: {
-    width: 20,
-    height: 20,
-    borderWidth: 2,
-    borderColor: '#B62020',
-    marginRight: 8,
+    width: 19,
+    height: 19,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    borderColor: theme.color.border.default,
+    alignItems: 'center',
     justifyContent: 'center',
+  },
+  checkboxOn: {
+    backgroundColor: theme.color.brand.base,
+    borderColor: theme.color.brand.base,
+  },
+  rememberText: {
+    fontFamily: theme.font.medium,
+    fontSize: theme.type.bodySm.fontSize,
+    color: theme.color.text.secondary,
+  },
+  forgot: {
+    fontFamily: theme.font.semibold,
+    fontSize: theme.type.bodySm.fontSize,
+    color: theme.color.brand.base,
+  },
+
+  primaryBtn: {
+    backgroundColor: theme.color.brand.base,
+    borderRadius: theme.radius.md,
+    minHeight: 54,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  checkboxChecked: {
-    backgroundColor: '#B62020',
+  btnDisabled: { opacity: 0.5 },
+  primaryBtnText: {
+    fontFamily: theme.font.semibold,
+    fontSize: theme.type.h3.fontSize,
+    color: theme.color.text.onBrand,
   },
-  checkmark: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontFamily: getFontFamily('bold'),
-  },
-  checkboxText: {
-    fontSize: 16,
-    color: '#000000',
-  },
-  forgotPassword: {
-    fontSize: 16,
-    color: '#B62020',
-    textDecorationLine: 'underline',
-  },
-  loginButton: {
-    borderRadius: 28,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  loginButtonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontFamily: getFontFamily('bold'),
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#E0E0E0',
-  },
+
+  divider: { flexDirection: 'row', alignItems: 'center', gap: theme.space.lg },
+  dividerLine: { flex: 1, height: 1, backgroundColor: theme.color.border.subtle },
   dividerText: {
-    marginHorizontal: 16,
-    color: '#999999',
-    fontSize: 14,
+    fontFamily: theme.font.medium,
+    fontSize: theme.type.caption.fontSize,
+    color: theme.color.text.muted,
   },
-  socialButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 40,
-  },
-  socialButton: {
-    flex: 1,
+
+  socialCol: { gap: theme.space.md },
+  socialBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 20,
-    paddingVertical: 12,
-    marginHorizontal: 8,
+    gap: theme.space.md,
+    backgroundColor: theme.color.surface.card,
+    borderRadius: theme.radius.md,
+    borderWidth: 1.5,
+    borderColor: theme.color.border.subtle,
+    minHeight: 52,
   },
-  googleIcon: {
-    fontSize: 20,
-    fontFamily: getFontFamily('bold'),
-    color: '#4285F4',
-    marginRight: 8,
+  socialLogo: { width: 19, height: 19 },
+  socialText: {
+    fontFamily: theme.font.semibold,
+    fontSize: theme.type.body.fontSize,
+    color: theme.color.text.primary,
   },
-  appleIcon: {
-    fontSize: 20,
-    marginRight: 8,
-  },
-  socialButtonText: {
-    fontSize: 16,
-    color: '#000000',
-  },
-  signupContainer: {
+
+  footer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: theme.space.sm,
   },
-  signupText: {
-    fontSize: 16,
-    color: '#000000',
+  footerText: {
+    fontFamily: theme.font.regular,
+    fontSize: theme.type.bodySm.fontSize,
+    color: theme.color.text.secondary,
   },
-  signupLink: {
-    fontSize: 16,
-    fontFamily: getFontFamily('heading'),
+  footerLink: {
+    fontFamily: theme.font.bold,
+    fontSize: theme.type.bodySm.fontSize,
+    color: theme.color.brand.base,
   },
 });
 

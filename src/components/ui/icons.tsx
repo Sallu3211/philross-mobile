@@ -163,18 +163,28 @@ export const Clock: Icon = ({ size, color = INK }) => (
   </Base>
 );
 
+/**
+ * Gift — box, lid and a bow.
+ *
+ * The first attempt drew a plain box bisected by a ribbon, which at 16px read
+ * as four squares rather than a present. The bow loops are now wide and sit
+ * clearly above the lid, which is what makes the shape legible small.
+ */
 export const Gift: Icon = ({ size, color = INK }) => (
   <Base size={size}>
+    {/* bow: two loops meeting at the centre knot */}
     <Path
-      d="M10.9 7.3H8.4a2.15 2.15 0 110-4.3c1.35 0 2.25 1.55 2.5 4.3zm2.2 0h2.5c1.2 0 2.15-.95 2.15-2.15A2.15 2.15 0 0015.6 3c-1.35 0-2.25 1.55-2.5 4.3z"
+      d="M11.05 6.55H8.1a2.28 2.28 0 01-1.63-3.88c.44-.44 1.03-.67 1.63-.67 1.05 0 1.93.6 2.53 1.4.42.56.75 1.24.99 1.94a.9.9 0 01-.57 1.21zm1.9 0h2.95a2.28 2.28 0 001.63-3.88 2.3 2.3 0 00-1.63-.67c-1.05 0-1.93.6-2.53 1.4-.42.56-.75 1.24-.99 1.94a.9.9 0 00.57 1.21z"
       fill={color}
     />
+    {/* lid */}
     <Path
-      d="M2.9 9.9c0-.9.7-1.6 1.6-1.6h6.4v4.5H2.9V9.9zm10.2-1.6h6.4c.9 0 1.6.7 1.6 1.6v2.9h-8V8.3z"
+      d="M3.15 9.35c0-1 .81-1.8 1.8-1.8h5.9v3.95H3.15V9.35zm9.95-1.8H19c1 0 1.8.81 1.8 1.8v2.15h-7.7V7.55z"
       fill={color}
     />
+    {/* body, split by the ribbon */}
     <Path
-      d="M4.4 15h6.5v6.1H7.9a3.5 3.5 0 01-3.5-3.5V15zm8.7 0h6.5v2.6a3.5 3.5 0 01-3.5 3.5h-3V15z"
+      d="M4.5 13.15h6.35v8.35H7.85a3.35 3.35 0 01-3.35-3.35v-5zm8.6 0h6.35v5a3.35 3.35 0 01-3.35 3.35H13.1v-8.35z"
       fill={color}
     />
   </Base>
@@ -192,6 +202,58 @@ export const Flame: Icon = ({ size, color = INK }) => (
   <Base size={size}>
     <Path
       d="M13.9 2.2c-.55 3.1.6 4.6 1.9 6.2 1.35 1.7 2.9 3.6 2.9 6.6a6.7 6.7 0 01-13.4 0c0-1.55.5-3.2 1.5-4.5.35 1.1 1.1 1.85 2 1.85 1 0 1.75-.8 1.75-1.95 0-.85-.45-1.8-.45-3.15 0-2.6 1.9-4.6 3.8-5.05z"
+      fill={color}
+    />
+  </Base>
+);
+
+/* ── Forms ──────────────────────────────────────────────────────────────── */
+
+export const Mail: Icon = ({ size, color = INK }) => (
+  <Base size={size}>
+    <Path
+      d="M2.4 8.15v9.05a3.4 3.4 0 003.4 3.4h12.4a3.4 3.4 0 003.4-3.4V8.15l-8.63 5.3a1.85 1.85 0 01-1.94 0L2.4 8.15z"
+      fill={color}
+    />
+    <Path
+      d="M21.5 6.1a3.4 3.4 0 00-3.3-2.7H5.8a3.4 3.4 0 00-3.3 2.7l9.03 5.55c.29.18.65.18.94 0L21.5 6.1z"
+      fill={color}
+    />
+  </Base>
+);
+
+export const User: Icon = ({ size, color = INK }) => (
+  <Base size={size}>
+    <Circle cx="12" cy="7.6" r="4.6" fill={color} />
+    <Path
+      d="M12 14.2c-4.1 0-7.4 2.3-7.4 5.1 0 1.1.9 1.9 2 1.9h10.8c1.1 0 2-.8 2-1.9 0-2.8-3.3-5.1-7.4-5.1z"
+      fill={color}
+    />
+  </Base>
+);
+
+export const Eye: Icon = ({ size, color = INK }) => (
+  <Base size={size}>
+    <Path
+      d="M12 4.6c-4.6 0-8.5 3-10.2 6.7a1.6 1.6 0 000 1.4C3.5 16.4 7.4 19.4 12 19.4s8.5-3 10.2-6.7a1.6 1.6 0 000-1.4C20.5 7.6 16.6 4.6 12 4.6zm0 11.2a3.8 3.8 0 110-7.6 3.8 3.8 0 010 7.6z"
+      fill={color}
+    />
+    <Circle cx="12" cy="12" r="1.9" fill={color} />
+  </Base>
+);
+
+export const EyeOff: Icon = ({ size, color = INK }) => (
+  <Base size={size}>
+    <Path
+      d="M3.6 2.5a1.2 1.2 0 00-1.7 1.7l17.9 17.9a1.2 1.2 0 001.7-1.7L3.6 2.5z"
+      fill={color}
+    />
+    <Path
+      d="M12 4.6c-1.2 0-2.4.2-3.5.57l2.24 2.24A3.8 3.8 0 0115.4 12.9l3.24 3.24c1.55-1.1 2.8-2.58 3.56-4.14a1.6 1.6 0 000-1.4C20.5 7.6 16.6 4.6 12 4.6z"
+      fill={color}
+    />
+    <Path
+      d="M5.1 7.4C3.4 8.55 2.1 10.1 1.8 11.3a1.6 1.6 0 000 1.4c1.7 3.7 5.6 6.7 10.2 6.7 1.5 0 3-.32 4.3-.9l-2.7-2.7a3.8 3.8 0 01-4.7-4.7L5.1 7.4z"
       fill={color}
     />
   </Base>
@@ -250,6 +312,10 @@ export const Icons = {
   CheckCircle,
   ProgressCircle,
   LockCircle,
+  Mail,
+  User,
+  Eye,
+  EyeOff,
 };
 
 export default Icons;

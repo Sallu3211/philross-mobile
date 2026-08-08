@@ -126,6 +126,13 @@ export const theme = {
       sunken: neutral[100],
       hero: '#1A1A19',
       heroRaised: '#242427',
+      /**
+       * Pure black, matching assets/bootsplash/manifest.json.
+       * Every current logo asset (splash PNG, launcher webp) bakes in a black
+       * background with no alpha channel, so a logo only sits cleanly on an
+       * exactly-black ground — anything else shows its corners as a box.
+       */
+      logoGround: '#000000',
       overlay: 'rgba(15,15,17,0.55)',
     },
 

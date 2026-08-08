@@ -7,11 +7,11 @@ export const Constants = {
     androidPackageName: 'com.philross',
     webDevUrl: 'https://web.philross.com/',
 
-    // Legal pages. These are the GitHub Pages docs added for store review
-    // (see docs/privacy-policy.html and docs/terms-of-use.html). If Pages is
-    // not enabled on the repo, point these at the philross.com equivalents.
-    privacyPolicyUrl: 'https://sallu3211.github.io/philross-mobile/privacy-policy.html',
-    termsOfUseUrl: 'https://sallu3211.github.io/philross-mobile/terms-of-use.html',
+    // Legal pages — the live URLs the sign-up screen already links to.
+    // (docs/privacy-policy.html and docs/terms-of-use.html in this repo are the
+    // GitHub Pages copies kept for store review.)
+    privacyPolicyUrl: 'https://philross.com/privacy-policy-terms-of-use',
+    termsOfUseUrl: 'https://philross.com/privacy-policy-terms-of-use',
 
     // API Endpoints
     endpoints: {
