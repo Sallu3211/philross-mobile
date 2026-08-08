@@ -2,6 +2,22 @@
   "migIndex": 1,
   "data": [
     {
+      "path": "app/assets/fonts/Montserrat-Bold.ttf",
+      "sha1": "8d25a921501a92977c63bbdc0545c9e8be0cac4b"
+    },
+    {
+      "path": "app/assets/fonts/Montserrat-Medium.ttf",
+      "sha1": "321d56022fc72f5e35decbc8e97442116a96908e"
+    },
+    {
+      "path": "app/assets/fonts/Montserrat-Regular.ttf",
+      "sha1": "7a56bc06d2b862fb6d070dfc77e8ac366e2942b2"
+    },
+    {
+      "path": "app/assets/fonts/Montserrat-SemiBold.ttf",
+      "sha1": "3db04f05d6ea9c594e32567b3e846efe66e8d47e"
+    },
+    {
       "path": "app/assets/fonts/OpenSans-Bold.ttf",
       "sha1": "94167913cf8ed4a0e12579ba8f412ab928e5d811"
     },
@@ -12,10 +28,6 @@
     {
       "path": "app/assets/fonts/PlayfairDisplay-SemiBold.ttf",
       "sha1": "2241ada3ac774a431a45969c00e3f0fe277da4fb"
-    },
-    {
-      "path": "app/assets/fonts/README.md",
-      "sha1": "ed80718496f4d212cd265a404df06c4bbbe7e63d"
     }
   ]
 }
