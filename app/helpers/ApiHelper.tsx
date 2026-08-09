@@ -1099,22 +1099,47 @@ export const getProfile = async (navigation: any) => {
     }
 };
 
-// Profile — update editable fields. PATCH so we only send what changed.
+/**
+ * Profile — update editable fields.
+ *
+ * The backend models the name as a single `full_name` — the same field signup
+ * posts. An earlier version sent first_name/last_name, which the endpoint
+ * rejected, and the app showed a bare "Request failed".
+ *
+ * Tries PATCH then falls back to PUT, since nothing in this codebase documents
+ * which the endpoint accepts. Returns the server's own message when there is
+ * one, so a failure is diagnosable instead of generic.
+ */
 export const updateProfile = async (
-    data: { first_name?: string; last_name?: string; full_name?: string },
+    data: { full_name?: string },
     navigation: any,
 ) => {
-    try {
-        const response = await apiCall({
+    const attempt = (method: 'PATCH' | 'PUT') =>
+        apiCall({
             endPoint: 'accounts/profile/',
-            method: 'PATCH',
-            data: data,
-            navigation: navigation,
+            method,
+            data,
+            navigation,
             isMultipart: false,
         });
-        return response;
-    } catch (error) {
+
+    const ok = (r: any) => !!r && r.success !== false && r.status !== false;
+
+    try {
+        const patched: any = await attempt('PATCH');
+        if (ok(patched)) return patched;
+
+        console.log('updateProfile: PATCH rejected, retrying as PUT', patched);
+        const put: any = await attempt('PUT');
+        if (ok(put)) return put;
+
+        // Surface whichever response actually carries a readable message.
+        return put?.message ? put : patched;
+    } catch (error: any) {
         console.error('Update Profile Error:', error);
-        return { success: false, message: 'Failed to update your profile.' };
+        return {
+            success: false,
+            message: error?.message ?? 'Failed to update your profile.',
+        };
     }
 };

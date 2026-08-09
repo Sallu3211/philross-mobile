@@ -83,17 +83,16 @@ const Row: React.FC<RowProps> = ({
 const ProfileScreen = ({ navigation }: any) => {
   const { user, setUser, getUserInitial, logout } = useUser();
 
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  // One field, because the backend stores one field. Splitting it into first and
+  // last here only invented a shape the API does not accept.
+  const [fullName, setFullName] = useState('');
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [notifications, setNotifications] = useState(true);
 
   /* Seed the form from whatever we already know, then refresh from the API. */
   useEffect(() => {
-    const parts = (user?.fullName ?? '').trim().split(/\s+/);
-    setFirstName(user?.firstName || parts[0] || '');
-    setLastName(user?.lastName || parts.slice(1).join(' ') || '');
+    setFullName(user?.fullName ?? '');
   }, [user]);
 
   useEffect(() => {
@@ -103,49 +102,45 @@ const ProfileScreen = ({ navigation }: any) => {
 
       const res: any = await getProfile(navigation).catch(() => null);
       const data = res?.data ?? res;
-      if (data && (data.first_name || data.last_name)) {
-        setFirstName(prev => data.first_name ?? prev);
-        setLastName(prev => data.last_name ?? prev);
-      }
+      const serverName = data?.full_name ?? data?.user?.full_name;
+      if (serverName) setFullName(serverName);
     })();
   }, [navigation]);
 
   const onSave = useCallback(async () => {
-    const first = firstName.trim();
-    const last = lastName.trim();
+    const name = fullName.trim();
 
-    if (!first) {
-      Alert.alert('Name required', 'Please enter your first name.');
+    if (!name) {
+      Alert.alert('Name required', 'Please enter your name.');
       return;
     }
 
     setSaving(true);
     try {
-      const res: any = await updateProfile(
-        { first_name: first, last_name: last, full_name: `${first} ${last}`.trim() },
-        navigation,
-      );
+      const res: any = await updateProfile({ full_name: name }, navigation);
 
       const ok = res?.success !== false && res?.status !== false;
       if (!ok) {
-        Alert.alert('Could not save', res?.message ?? 'Please try again.');
+        // Show what the server actually said rather than a generic failure.
+        const detail =
+          typeof res?.message === 'string'
+            ? res.message
+            : Array.isArray(res?.message)
+            ? res.message[0]
+            : res?.message?.full_name?.[0] ?? 'Please try again.';
+        Alert.alert('Could not save', detail);
         return;
       }
 
       // Write back into context so the greeting and avatar update immediately.
-      await setUser({
-        ...(user as any),
-        firstName: first,
-        lastName: last,
-        fullName: `${first} ${last}`.trim(),
-      });
+      await setUser({ ...(user as any), fullName: name });
 
       setDirty(false);
       Alert.alert('Saved', 'Your name has been updated.');
     } finally {
       setSaving(false);
     }
-  }, [firstName, lastName, navigation, setUser, user]);
+  }, [fullName, navigation, setUser, user]);
 
   const onToggleNotifications = useCallback(async (next: boolean) => {
     setNotifications(next);
@@ -234,7 +229,7 @@ const ProfileScreen = ({ navigation }: any) => {
             </Text>
           </View>
           <Text style={styles.identityName} numberOfLines={1}>
-            {`${firstName} ${lastName}`.trim() || 'Your name'}
+            {fullName.trim() || 'Your name'}
           </Text>
           <Text style={styles.identityEmail} numberOfLines={1}>
             {user?.email ?? ''}
@@ -246,34 +241,19 @@ const ProfileScreen = ({ navigation }: any) => {
           <Text style={styles.cardTitle}>Your details</Text>
 
           <View style={styles.field}>
-            <Text style={styles.fieldLabel}>First name</Text>
+            <Text style={styles.fieldLabel}>Full name</Text>
             <TextInput
               style={styles.input}
-              value={firstName}
+              value={fullName}
               onChangeText={t => {
-                setFirstName(t);
+                setFullName(t);
                 setDirty(true);
               }}
-              placeholder="First name"
-              placeholderTextColor={theme.color.text.disabled}
-              autoCapitalize="words"
-              returnKeyType="next"
-            />
-          </View>
-
-          <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Last name</Text>
-            <TextInput
-              style={styles.input}
-              value={lastName}
-              onChangeText={t => {
-                setLastName(t);
-                setDirty(true);
-              }}
-              placeholder="Last name"
+              placeholder="Your name"
               placeholderTextColor={theme.color.text.disabled}
               autoCapitalize="words"
               returnKeyType="done"
+              onSubmitEditing={onSave}
             />
           </View>
 

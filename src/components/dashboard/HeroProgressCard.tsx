@@ -77,7 +77,7 @@ export const HeroProgressCard: React.FC<HeroProgressCardProps> = ({
 
     <ProgressRing
       progress={loading ? 0 : progress}
-      size={104}
+      size={96}
       strokeWidth={9}
       color={theme.color.progress.fillOnDark}
       trackColor={theme.color.progress.trackOnDark}
@@ -96,12 +96,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: theme.space.xl,
     borderRadius: theme.radius['2xl'],
-    gap: theme.space.lg,
+    gap: theme.space.md,
+    // The ring is a fixed 96pt; without this the text column could push it past
+    // the card edge on narrower phones, clipping the ring and the figure labels.
+    overflow: 'hidden',
     ...theme.shadow.lg,
   },
   left: {
     flex: 1,
     minWidth: 0,
+    flexShrink: 1,
   },
   title: {
     fontFamily: theme.font.bold,
@@ -121,16 +125,19 @@ const styles = StyleSheet.create({
   figures: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: theme.space.xl,
+    marginTop: theme.space.lg,
   },
   fig: {
-    minWidth: 62,
+    // Was a 62pt minimum, which forced the row wider than the column on small
+    // screens and pushed the labels out of the card.
+    flexShrink: 1,
+    paddingRight: theme.space.md,
   },
   divider: {
     width: 1,
     height: 24,
     backgroundColor: theme.color.border.onDark,
-    marginRight: theme.space.lg,
+    marginRight: theme.space.md,
   },
   figValue: {
     fontFamily: theme.font.bold,

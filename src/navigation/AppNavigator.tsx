@@ -51,11 +51,10 @@ const AppNavigator = () => {
         <Stack.Screen name="SignUp" component={SignUpScreen} />
         <Stack.Screen name="Dashboard" component={DashboardScreen} />
         <Stack.Screen name="Profile" component={ProfileScreen} />
-        <Stack.Screen
-          name="Paywall"
-          component={PaywallScreen}
-          options={{ presentation: 'modal' }}
-        />
+        {/* Full screen, not a modal card. As a modal, iOS leaves the screen
+            behind visible as a white strip along the top, which read as a
+            broken popup rather than a considered page. */}
+        <Stack.Screen name="Paywall" component={PaywallScreen} />
         <Stack.Screen name="Feed" component={FeedScreen} />
         <Stack.Screen name="Video" component={VideoScreen} />
         <Stack.Screen name="Events" component={EventsScreen} />
