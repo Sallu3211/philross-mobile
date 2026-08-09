@@ -207,6 +207,42 @@ export const Flame: Icon = ({ size, color = INK }) => (
   </Base>
 );
 
+export const Search: Icon = ({ size, color = INK }) => (
+  <Base size={size}>
+    <Path
+      d="M10.8 2.4a8.4 8.4 0 105.15 15.04l4.3 4.3a1.2 1.2 0 001.7-1.7l-4.3-4.3A8.4 8.4 0 0010.8 2.4zm0 2.4a6 6 0 110 12 6 6 0 010-12z"
+      fill={color}
+    />
+  </Base>
+);
+
+export const Filter: Icon = ({ size, color = INK }) => (
+  <Base size={size}>
+    <Path
+      d="M3.4 5.6c0-.83.67-1.5 1.5-1.5h14.2a1.5 1.5 0 010 3H4.9c-.83 0-1.5-.67-1.5-1.5zm2.4 6.4c0-.83.67-1.5 1.5-1.5h9.4a1.5 1.5 0 010 3H7.3c-.83 0-1.5-.67-1.5-1.5zm2.4 6.4c0-.83.67-1.5 1.5-1.5h4.6a1.5 1.5 0 010 3H9.7c-.83 0-1.5-.67-1.5-1.5z"
+      fill={color}
+    />
+  </Base>
+);
+
+export const MapPin: Icon = ({ size, color = INK }) => (
+  <Base size={size}>
+    <Path
+      d="M12 2.2a7.8 7.8 0 00-7.8 7.8c0 5.4 6.36 11.1 7 11.66a1.2 1.2 0 001.6 0c.64-.56 7-6.26 7-11.66A7.8 7.8 0 0012 2.2zm0 10.6a2.9 2.9 0 110-5.8 2.9 2.9 0 010 5.8z"
+      fill={color}
+    />
+  </Base>
+);
+
+export const Tag: Icon = ({ size, color = INK }) => (
+  <Base size={size}>
+    <Path
+      d="M11.05 2.6H5.4A2.8 2.8 0 002.6 5.4v5.65c0 .74.3 1.45.82 1.98l8.2 8.2a2.8 2.8 0 003.96 0l6.05-6.05a2.8 2.8 0 000-3.96l-8.2-8.2a2.8 2.8 0 00-1.98-.82zM7.6 9.4a1.8 1.8 0 110-3.6 1.8 1.8 0 010 3.6z"
+      fill={color}
+    />
+  </Base>
+);
+
 export const Close: Icon = ({ size, color = INK }) => (
   <Base size={size}>
     <Path
@@ -360,6 +396,10 @@ export const Icons = {
   LogOut,
   Star,
   Phone,
+  Search,
+  Filter,
+  MapPin,
+  Tag,
 };
 
 export default Icons;
