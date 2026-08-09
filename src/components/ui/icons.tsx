@@ -207,6 +207,46 @@ export const Flame: Icon = ({ size, color = INK }) => (
   </Base>
 );
 
+export const Close: Icon = ({ size, color = INK }) => (
+  <Base size={size}>
+    <Path
+      d="M5.3 3.6a1.2 1.2 0 00-1.7 1.7L10.3 12l-6.7 6.7a1.2 1.2 0 101.7 1.7L12 13.7l6.7 6.7a1.2 1.2 0 001.7-1.7L13.7 12l6.7-6.7a1.2 1.2 0 00-1.7-1.7L12 10.3 5.3 3.6z"
+      fill={color}
+    />
+  </Base>
+);
+
+export const LogOut: Icon = ({ size, color = INK }) => (
+  <Base size={size}>
+    <Path
+      d="M13.4 2.6H8.2A4.2 4.2 0 004 6.8v10.4a4.2 4.2 0 004.2 4.2h5.2a1.15 1.15 0 000-2.3H8.2a1.9 1.9 0 01-1.9-1.9V6.8a1.9 1.9 0 011.9-1.9h5.2a1.15 1.15 0 000-2.3z"
+      fill={color}
+    />
+    <Path
+      d="M17.5 7.9a1.15 1.15 0 00-1.63 1.63l1.32 1.32h-6.34a1.15 1.15 0 000 2.3h6.34l-1.32 1.32a1.15 1.15 0 101.63 1.63l3.28-3.29a1.15 1.15 0 000-1.62L17.5 7.9z"
+      fill={color}
+    />
+  </Base>
+);
+
+export const Star: Icon = ({ size, color = INK }) => (
+  <Base size={size}>
+    <Path
+      d="M12 2.4l2.72 5.86 6.42.79a1 1 0 01.56 1.73l-4.73 4.36 1.25 6.34a1 1 0 01-1.47 1.07L12 19.4l-5.75 3.15a1 1 0 01-1.47-1.07l1.25-6.34-4.73-4.36a1 1 0 01.56-1.73l6.42-.79L12 2.4z"
+      fill={color}
+    />
+  </Base>
+);
+
+export const Phone: Icon = ({ size, color = INK }) => (
+  <Base size={size}>
+    <Path
+      d="M7.4 2.9c.86-.34 1.84.02 2.28.84l1.5 2.8c.4.75.23 1.68-.42 2.23l-1.2 1.02a.6.6 0 00-.16.68c.9 2.1 2.6 3.8 4.7 4.7a.6.6 0 00.68-.16l1.02-1.2c.55-.65 1.48-.82 2.23-.42l2.8 1.5c.82.44 1.18 1.42.84 2.28l-.6 1.5a3 3 0 01-3.3 1.84C10.9 19.5 4.5 13.1 3.46 6.03A3 3 0 015.3 2.73l2.1-.84z"
+      fill={color}
+    />
+  </Base>
+);
+
 /* ── Forms ──────────────────────────────────────────────────────────────── */
 
 export const Mail: Icon = ({ size, color = INK }) => (
@@ -316,6 +356,10 @@ export const Icons = {
   User,
   Eye,
   EyeOff,
+  Close,
+  LogOut,
+  Star,
+  Phone,
 };
 
 export default Icons;

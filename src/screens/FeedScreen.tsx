@@ -14,7 +14,9 @@ import {
 } from 'react-native';
 import { getFontFamily, getResponsiveStyles } from '../utils/platform';
 import SideMenu from '../components/SideMenu';
-import MenuIcon from '../../assets/icons/menu.svg';
+// Shared icon set, so the hamburger matches the one on the dashboard.
+import { Menu as MenuIcon } from '../components/ui/icons';
+import { theme as appTheme } from '../theme';
 import PhilrossLogo from '../../assets/icons/logo_master.png';
 import ArrowDownIcon from '../../assets/icons/arrow-down.svg';
 import FilterIcon from '../../assets/icons/filter.svg';
@@ -380,7 +382,7 @@ const FeedScreen = ({ navigation }: any) => {
       {/* Top Navigation Bar */}
       <View style={[styles.topNav, responsiveStyles.topNav]}>
         <TouchableOpacity style={[styles.menuButton, responsiveStyles.menuButton]} onPress={() => setShowSideMenu(true)}>
-          <MenuIcon width={24} height={24} />
+          <MenuIcon size={22} color={appTheme.color.text.primary} />
         </TouchableOpacity>
         <View style={styles.logoContainer}>
           <Image source={PhilrossLogo} style={{ width: 44, height: 44, borderRadius: 9 }} resizeMode="contain" />

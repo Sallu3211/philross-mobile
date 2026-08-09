@@ -15,7 +15,9 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { getFontFamily, getColors } from '../utils/platform';
-import MenuIcon from '../../assets/icons/menu.svg';
+// Shared icon set, so the hamburger matches the one on the dashboard.
+import { Menu as MenuIcon } from '../components/ui/icons';
+import { theme as appTheme } from '../theme';
 import SideMenu from '../components/SideMenu';
 import FeedIcon from '../../assets/icons/home.svg';
 import EventsIcon from '../../assets/icons/calendar.svg';
@@ -283,7 +285,7 @@ const ProductsScreen = ({ navigation }: any) => {
       {/* Top Navigation */}
       <View style={styles.topNav}>
         <TouchableOpacity style={styles.menuButton} onPress={() => setShowSideMenu(true)}>
-          <MenuIcon width={24} height={24} />
+          <MenuIcon size={22} color={appTheme.color.text.primary} />
         </TouchableOpacity>
                   <Text style={[styles.title, { fontFamily: getFontFamily('bold') }]}>Products</Text>
           <TouchableOpacity style={styles.profileButton}>

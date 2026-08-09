@@ -14,7 +14,9 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import { getFontFamily, getColors } from '../utils/platform';
 import SideMenu from '../components/SideMenu';
-import MenuIcon from '../../assets/icons/menu.svg';
+// Shared icon set, so the hamburger matches the one on the dashboard.
+import { Menu as MenuIcon } from '../components/ui/icons';
+import { theme as appTheme } from '../theme';
 import TickCircleIcon from '../../assets/icons/tick-circle.svg';
 import FeedIcon from '../../assets/icons/home.svg';
 import EventsIcon from '../../assets/icons/calendar.svg';
@@ -92,7 +94,7 @@ const MyCoachScreen = ({ navigation }: any) => {
       {/* Top Navigation */}
       <View style={styles.topNav}>
         <TouchableOpacity style={styles.menuButton} onPress={() => setShowSideMenu(true)}>
-          <MenuIcon width={24} height={24} />
+          <MenuIcon size={22} color={appTheme.color.text.primary} />
         </TouchableOpacity>
         <Text style={[styles.title, { fontFamily: getFontFamily('bold') }]}>Personal Training</Text>
         <TouchableOpacity style={styles.profileButton}>
