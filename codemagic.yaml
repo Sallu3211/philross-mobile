@@ -11,6 +11,7 @@ workflows:
         - appstore_credentials
       vars:
         BUNDLE_ID: "com.philross"
+        APP_STORE_APP_ID: "6751194230"
         XCODE_WORKSPACE: "ios/philross.xcworkspace"
         XCODE_SCHEME: "philross"
       node: 20.19.0
@@ -48,7 +49,27 @@ workflows:
           xcode-project use-profiles --project ios/philross.xcodeproj --warn-only
       - name: Increment build number
         script: |
-          cd ios && agvtool new-version -all $(($(app-store-connect get-latest-testflight-build-number "$BUNDLE_ID") + 1))
+          # The old one-liner was:
+          #   agvtool new-version -all $(($(app-store-connect \
+          #     get-latest-testflight-build-number "$BUNDLE_ID") + 1))
+          # If that lookup returns nothing, $(( + 1)) evaluates to 1, and build 1
+          # already exists — App Store Connect then rejects the upload with
+          # "includes an attribute with a value that has already been used".
+          #
+          # Ask by App Store app id (highest build across ALL versions, which is
+          # what Apple requires to increase), fall back to the TestFlight lookup,
+          # and only then to 0.
+          cd ios
+          LATEST=$(app-store-connect get-latest-app-store-build-number "$APP_STORE_APP_ID" 2>/dev/null || true)
+          if ! echo "$LATEST" | grep -qE '^[0-9]+$'; then
+            LATEST=$(app-store-connect get-latest-testflight-build-number "$BUNDLE_ID" 2>/dev/null || true)
+          fi
+          if ! echo "$LATEST" | grep -qE '^[0-9]+$'; then
+            LATEST=0
+          fi
+          NEW=$((LATEST + 1))
+          echo "Latest build number seen: $LATEST -> using $NEW"
+          agvtool new-version -all "$NEW"
       - name: Build ipa for App Store distribution
         script: |
           xcode-project build-ipa \
