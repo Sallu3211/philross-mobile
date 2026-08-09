@@ -1,40 +1,29 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Platform,
-  TextInput,
-  Dimensions,
-  Image,
   ActivityIndicator,
   Alert,
+  FlatList,
+  Image,
   Linking,
+  RefreshControl,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
-import { getFontFamily, getColors } from '../utils/platform';
-// Shared icon set, so the hamburger matches the one on the dashboard.
-import { Menu as MenuIcon } from '../components/ui/icons';
-import { theme as appTheme } from '../theme';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import SideMenu from '../components/SideMenu';
-import FeedIcon from '../../assets/icons/home.svg';
-import EventsIcon from '../../assets/icons/calendar.svg';
-import ProductsIcon from '../../assets/icons/bag-2-red.svg';
-import MyCoachIcon from '../../assets/icons/weight.svg';
-import CoursesIcon from '../../assets/icons/teacher.svg';
-import SearchIcon from '../../assets/icons/search-normal.svg';
+import { theme } from '../theme';
+import ScreenHeader from '../components/ui/ScreenHeader';
+import SearchBar from '../components/ui/SearchBar';
+import FilterChips from '../components/ui/FilterChips';
+import { EmptyState, LoadingState } from '../components/ui/StateView';
+import { ChevronRight, Shop } from '../components/ui/icons';
 import { getProductList, getProductCategories } from '../../app/helpers/ApiHelper';
-import { useUser } from '../context/UserContext';
-import { Loader } from '../components/Loader';
 import { pushCleverTapEvent } from '../../App';
 
-const { width } = Dimensions.get('window');
-
 const ProductsScreen = ({ navigation }: any) => {
-  const colors = getColors();
-  const { user, getUserInitial, isLoggedIn } = useUser();
   const [showSideMenu, setShowSideMenu] = useState(false);
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -49,8 +38,8 @@ const ProductsScreen = ({ navigation }: any) => {
     { id: 'support', label: 'Support', slug: 'support' }
   ]);
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [isLoadingCategories, setIsLoadingCategories] = useState(false);
-  const [isSearching, setIsSearching] = useState(false);
+  const [, setIsLoadingCategories] = useState(false);
+  const [, setIsSearching] = useState(false);
   
   // Ref for search timeout
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -60,6 +49,9 @@ const ProductsScreen = ({ navigation }: any) => {
     fetchCategories();
     fetchProducts();
     pushCleverTapEvent('products_viewed', {});
+    // Mount-only: both fetchers close over state they also set, so listing them
+    // here would refetch on every result.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Cleanup search timeout on unmount
@@ -279,514 +271,229 @@ const ProductsScreen = ({ navigation }: any) => {
     }
   };
 
+  const chipOptions = categories
+    .filter((c: any) => (c?.id ?? c?.slug) !== 'all')
+    .map((c: any) => ({
+      id: String(c?.id ?? c?.slug),
+      label: String(c?.label ?? c?.name ?? c?.slug ?? ''),
+    }));
+
+  const selectCategory = (id: string) => {
+    const next = selectedCategory === id ? 'all' : id;
+    setSelectedCategory(next);
+    setCurrentPage(1);
+    fetchProducts(1, false, next);
+  };
+
+  const money = (value: unknown): string | null => {
+    const n = parseFloat(String(value ?? ''));
+    return Number.isFinite(n) && n > 0 ? `$${n.toFixed(n % 1 === 0 ? 0 : 2)}` : null;
+  };
+
   return (
-    <>
-    <View style={styles.container}>
-      {/* Top Navigation */}
-      <View style={styles.topNav}>
-        <TouchableOpacity style={styles.menuButton} onPress={() => setShowSideMenu(true)}>
-          <MenuIcon size={22} color={appTheme.color.text.primary} />
-        </TouchableOpacity>
-                  <Text style={[styles.title, { fontFamily: getFontFamily('bold') }]}>Products</Text>
-          <TouchableOpacity style={styles.profileButton}>
-            <Text style={styles.profileText}>{isLoggedIn ? getUserInitial() : '?'}</Text>
-          </TouchableOpacity>
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <StatusBar barStyle="dark-content" backgroundColor={theme.color.surface.app} />
+
+      <ScreenHeader
+        title="Books & Gear"
+        subtitle={
+          products.length > 0
+            ? `${products.length} ${products.length === 1 ? 'item' : 'items'}`
+            : undefined
+        }
+        onMenu={() => setShowSideMenu(true)}
+      />
+
+      <View style={styles.searchWrap}>
+        <SearchBar
+          value={searchQuery}
+          onChangeText={handleSearchInputChange}
+          onSubmit={handleSearch}
+          placeholder="Search books and gear"
+        />
       </View>
 
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <SearchIcon width={20} height={20} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="search..."
-            placeholderTextColor="#666666"
-            value={searchQuery}
-            onChangeText={handleSearchInputChange}
-            onSubmitEditing={handleSearch}
-            returnKeyType="search"
-          />
-          {isSearching && (
-            <ActivityIndicator size="small" color="#B62020" style={styles.searchLoading} />
-          )}
-          {searchQuery.trim() && !isSearching && (
-            <TouchableOpacity 
-              style={styles.clearSearchButton}
-              onPress={() => {
-                setSearchQuery('');
-                setProducts([]);
-                fetchProducts(1, false);
-              }}
-            >
-              <Text style={styles.clearSearchText}>✕</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
+      {chipOptions.length > 0 && (
+        <FilterChips
+          options={chipOptions}
+          selected={selectedCategory === 'all' ? [] : [selectedCategory]}
+          onToggle={selectCategory}
+          onClear={() => selectCategory('all')}
+          allLabel="All"
+          style={styles.chips}
+        />
+      )}
 
-        {/* Category Filters */}
-        <View style={styles.categoryFilters}>
-          {isLoadingCategories ? (
-            <View style={styles.categoryLoadingContainer}>
-              <ActivityIndicator size="small" color="#B62020" />
-              <Text style={[styles.categoryLoadingText, { fontFamily: getFontFamily('body') }]}>
-                Loading categories...
-              </Text>
-            </View>
-          ) : (
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.categoryScrollContainer}
-              style={styles.categoryScrollView}
-            >
-              {categories.map((category) => (
-                <TouchableOpacity
-                  key={category.id}
-                  style={[
-                    styles.categoryButton,
-                    selectedCategory === category.id && styles.activeCategoryButton,
-                  ]}
-                  onPress={() => {
-                    setSelectedCategory(category.id);
-                    // Reset to first page when category changes
-                    setCurrentPage(1);
-                    setProducts([]);
-                    // Fetch products with new category - pass category directly to avoid race condition
-                    fetchProducts(1, false, category.id);
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.categoryText,
-                      selectedCategory === category.id && styles.activeCategoryText,
-                      { fontFamily: getFontFamily('body') }
-                    ]}
-                  >
-                    {category.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          )}
-        </View>
-
-        {/* Products Grid */}
-      <ScrollView 
-        style={styles.productsContainer} 
-        showsVerticalScrollIndicator={false}
-        onScroll={({ nativeEvent }) => {
-          const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
-          const paddingToBottom = 20;
-          if (layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom) {
-            loadMoreProducts();
+      {isLoading && products.length === 0 ? (
+        <LoadingState label="Loading products" />
+      ) : (
+        <FlatList
+          data={products}
+          keyExtractor={(item: any, i) => String(item?.id ?? i)}
+          numColumns={2}
+          columnWrapperStyle={styles.column}
+          contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
+          onEndReachedThreshold={0.4}
+          onEndReached={() => loadMoreProducts()}
+          refreshControl={
+            <RefreshControl
+              refreshing={isLoading && products.length > 0}
+              onRefresh={() => fetchProducts(1, false)}
+              tintColor={theme.color.brand.base}
+              colors={[theme.color.brand.base]}
+            />
           }
-        }}
-        scrollEventThrottle={400}
-      >
-        {/* Search Results Header */}
-        {searchQuery.trim() && products.length > 0 && (
-          <View style={styles.searchResultsHeader}>
-            <Text style={[styles.searchResultsText, { fontFamily: getFontFamily('bold') }]}>
-              Search results for "{searchQuery}"
-            </Text>
-            <Text style={[styles.searchResultsCount, { fontFamily: getFontFamily('body') }]}>
-              {products.length} product{products.length !== 1 ? 's' : ''} found
-            </Text>
-          </View>
-        )}
-        
-        <View style={styles.productsGrid}>
-          {products.map((product) => (
-            <TouchableOpacity 
-              key={product.id} 
-              style={styles.productCard}
-              onPress={() => handleProductClick(product)}
+          ListEmptyComponent={
+            <EmptyState
+              icon={Shop}
+              title={searchQuery ? 'Nothing found' : 'No products yet'}
+              body={
+                searchQuery
+                  ? `Nothing matches "${searchQuery}". Try a different search.`
+                  : "Phil's books and gear will appear here."
+              }
+              actionLabel={searchQuery ? 'Clear search' : undefined}
+              onAction={searchQuery ? () => handleSearchInputChange('') : undefined}
+            />
+          }
+          ListFooterComponent={
+            isLoading && products.length > 0 ? (
+              <View style={styles.footerLoad}>
+                <ActivityIndicator color={theme.color.brand.base} />
+              </View>
+            ) : null
+          }
+          renderItem={({ item }: any) => (
+            <TouchableOpacity
+              style={styles.card}
+              onPress={() => handleProductClick(item)}
+              activeOpacity={0.88}
+              accessibilityRole="button"
+              accessibilityLabel={item?.title ?? 'Product'}
             >
-              <View style={styles.imageCard}>
-                {product.cropped_image_url ? (
+              {/* Square frame with `contain`, not a cropped strip. Book covers
+                  are portrait; the old fixed 100pt "cover" cut their tops off. */}
+              <View style={styles.imageFrame}>
+                {item?.cropped_image_url ? (
                   <Image
-                    source={{ uri: product.cropped_image_url }}
-                    style={styles.productImage}
-                    resizeMode="cover"
+                    source={{ uri: item.cropped_image_url }}
+                    style={styles.image}
+                    resizeMode="contain"
                   />
                 ) : (
-                  <View style={styles.productImagePlaceholder}>
-                    <Icon name="image-outline" size={40} color="#CCCCCC" />
+                  <View style={styles.imageEmpty}>
+                    <Shop size={26} color={theme.color.text.disabled} />
                   </View>
                 )}
               </View>
-              <View style={styles.productContent}>
-                <Text 
-                  style={[styles.productTitle, { fontFamily: getFontFamily('bold') }]}
-                  numberOfLines={2}
-                  ellipsizeMode="tail"
-                >
-                  {product.headline || product.title || 'Product Title'}
+
+              <View style={styles.cardBody}>
+                <Text style={styles.cardTitle} numberOfLines={2}>
+                  {item?.title ?? 'Untitled'}
                 </Text>
-                <Text 
-                  style={[styles.productDescription, { fontFamily: getFontFamily('body') }]}
-                  numberOfLines={3}
-                  ellipsizeMode="tail"
-                >
-                  {product.description || 'No description available'}
-                </Text>
-                <View style={styles.productPriceRow}>
-                  <View style={styles.priceContainer}>
-                    <Text style={[styles.priceLabel, { fontFamily: getFontFamily('body') }]}>Price</Text>
-                    <Text style={[styles.productPrice, { fontFamily: getFontFamily('bold') }]}>
-                      ${parseFloat(product.price || '0').toFixed(2)}
-                    </Text>
-                  </View>
-                  <TouchableOpacity 
-                    style={styles.shopNowButton}
-                    onPress={() => handleProductClick(product)}
-                  >
-                    <Text style={[styles.shopNowText, { fontFamily: getFontFamily('bold') }]}>
-                      Shop Now
-                    </Text>
-                  </TouchableOpacity>
+                {!!item?.headline && (
+                  <Text style={styles.cardSub} numberOfLines={2}>
+                    {item.headline}
+                  </Text>
+                )}
+                <View style={styles.cardFoot}>
+                  {money(item?.price) ? (
+                    <Text style={styles.price}>{money(item?.price)}</Text>
+                  ) : (
+                    <Text style={styles.priceMuted}>View</Text>
+                  )}
+                  <ChevronRight size={13} color={theme.color.text.disabled} />
                 </View>
               </View>
             </TouchableOpacity>
-          ))}
-          
-          {/* Loading indicator */}
-          {isLoading && (
-            <View style={styles.loadingContainer}>
-              {/* <ActivityIndicator size="large" color="#B62020" />
-              <Text style={[styles.loadingText, { fontFamily: getFontFamily('body') }]}>
-                Loading products...
-              </Text> */}
-            </View>
           )}
-          
-          {/* No products message */}
-          {!isLoading && products.length === 0 && (
-            <View style={styles.noProductsContainer}>
-              <Text style={[styles.noProductsText, { fontFamily: getFontFamily('body') }]}>
-                No products found
-              </Text>
-              <Text style={[styles.noProductsSubText, { fontFamily: getFontFamily('body') }]}>
-                Try adjusting your search or category filter
-              </Text>
-            </View>
-          )}
-        </View>
-      </ScrollView>
+        />
+      )}
 
-      {/* Bottom Navigation */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Feed')}>
-          <FeedIcon width={24} height={24} />
-          <Text style={[styles.navText, { fontFamily: getFontFamily('body') }]}>Feed</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Events')}>
-          <EventsIcon width={24} height={24} />
-          <Text style={[styles.navText, { fontFamily: getFontFamily('body') }]}>Events</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <ProductsIcon width={24} height={24} />
-          <Text style={[styles.navText, styles.activeNavText, { fontFamily: getFontFamily('bold') }]}>Products</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('MyCoach')}>
-          <MyCoachIcon width={24} height={24} />
-          <Text style={[styles.navText, { fontFamily: getFontFamily('body') }]}>My Coach</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Courses')}>
-          <CoursesIcon width={24} height={24} />
-          <Text style={[styles.navText, { fontFamily: getFontFamily('body') }]}>Courses</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Side Menu */}
-      <SideMenu 
-        isVisible={showSideMenu} 
-        onClose={() => setShowSideMenu(false)} 
+      <SideMenu
+        isVisible={showSideMenu}
+        onClose={() => setShowSideMenu(false)}
         navigation={navigation}
       />
-    </View>
-      {isLoading && (
-        <Loader value='Loading products...' />
-      )}
-    </>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  safe: { flex: 1, backgroundColor: theme.color.surface.app },
+  searchWrap: {
+    paddingHorizontal: theme.space.screen,
+    paddingBottom: theme.space.md,
+  },
+  chips: { marginBottom: theme.space.md },
+  list: {
+    paddingHorizontal: theme.space.screen,
+    paddingBottom: theme.space['5xl'],
+    gap: theme.space.md,
+  },
+  column: { gap: theme.space.md },
+
+  card: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.color.surface.card,
+    borderRadius: 16,
+    overflow: 'hidden',
   },
-  topNav: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  /** Square, so every tile lines up regardless of the artwork's shape. */
+  imageFrame: {
+    aspectRatio: 1,
+    backgroundColor: theme.color.neutral[0],
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 24,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
-    paddingBottom: 20,
-    minHeight: Platform.OS === 'ios' ? 100 : 80,
-  },
-  menuButton: {
-    padding: 8,
-    minWidth: 44,
-    minHeight: 44,
     justifyContent: 'center',
+    padding: theme.space.md,
+  },
+  image: { width: '100%', height: '100%' },
+  imageEmpty: {
+    width: '100%',
+    height: '100%',
     alignItems: 'center',
-  },
-  title: {
-    fontSize: 20,
-    fontFamily: getFontFamily('bold'),
-    color: '#000000',
-  },
-  profileButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#000000',
     justifyContent: 'center',
-    alignItems: 'center',
-    minWidth: 40,
-    minHeight: 40,
-  },
-  profileText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontFamily: getFontFamily('bold'),
-  },
-  searchContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 30,
-    paddingHorizontal: 15,
-    paddingVertical: 2,
-  },
-  searchInput: {
-    flex: 1,
-    marginLeft: 10,
-    fontSize: 16,
-    color: '#000000',
-  },
-  clearSearchButton: {
-    padding: 8,
-    marginRight: 5,
-  },
-  clearSearchText: {
-    fontSize: 16,
-    color: '#666666',
-    fontFamily: getFontFamily('bold'),
-  },
-  searchLoading: {
-    marginRight: 10,
-  },
-  searchResultsHeader: {
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: '#F8F8F8',
-    marginBottom: 10,
-  },
-  searchResultsText: {
-    fontSize: 16,
-    color: '#000000',
-    marginBottom: 5,
-  },
-  searchResultsCount: {
-    fontSize: 14,
-    color: '#666666',
+    backgroundColor: theme.color.surface.sunken,
+    borderRadius: theme.radius.md,
   },
 
-  productsContainer: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 20,
+  cardBody: {
+    padding: theme.space.lg,
+    paddingTop: theme.space.md,
+    gap: 3,
+    borderTopWidth: 1,
+    borderTopColor: theme.color.border.subtle,
   },
-  productsGrid: {
+  cardTitle: {
+    fontFamily: theme.font.semibold,
+    fontSize: theme.type.bodySm.fontSize,
+    lineHeight: theme.type.bodySm.lineHeight,
+    color: theme.color.text.primary,
+  },
+  cardSub: {
+    fontFamily: theme.font.regular,
+    fontSize: theme.type.overline.fontSize,
+    lineHeight: 15,
+    color: theme.color.text.muted,
+  },
+  cardFoot: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
     justifyContent: 'space-between',
+    marginTop: theme.space.sm,
   },
-  productCard: {
-    width: (width - 50) / 2,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    marginBottom: 12,
-    shadowColor: '#000000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  price: {
+    fontFamily: theme.font.bold,
+    fontSize: theme.type.bodySm.fontSize,
+    color: theme.color.brand.base,
   },
-  imageCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    padding: 8,
-    marginBottom: 8,
+  priceMuted: {
+    fontFamily: theme.font.semibold,
+    fontSize: theme.type.caption.fontSize,
+    color: theme.color.text.muted,
   },
-  productImagePlaceholder: {
-    width: '100%',
-    height: 100,
-    borderRadius: 8,
-    backgroundColor: '#F5F5F5',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  productContent: {
-    flex: 1,
-    padding: 8,
-    justifyContent: 'space-between', // This ensures price section stays at bottom
-  },
-  productTitle: {
-    fontSize: 13,
-    fontFamily: getFontFamily('bold'),
-    color: '#000000',
-    marginTop: 0,
-  },
-  productDescription: {
-    fontSize: 11,
-    color: '#666666',
-    marginBottom: 6,
-  },
-  productPriceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  priceContainer: {
-    flex: 1,
-  },
-  priceLabel: {
-    fontSize: 10,
-    color: '#666666',
-  },
-  productPrice: {
-    fontSize: 16,
-    fontFamily: getFontFamily('bold'),
-    color: '#000000',
-  },
-  shopNowButton: {
-    backgroundColor: '#B62020',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  shopNowText: {
-    fontSize: 12,
-    fontFamily: getFontFamily('bold'),
-    color: '#FFFFFF',
-  },
-  bottomNav: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    paddingBottom: Platform.OS === 'ios' ? 20 : 0,
-  },
-  navItem: {
-    alignItems: 'center',
-    flex: 1,
-    paddingVertical: 12,
-    paddingBottom: 16,
-  },
-  navText: {
-    fontSize: 12,
-    color: '#666666',
-    marginTop: 4,
-  },
-  activeNavText: {
-    color: '#B62020',
-    fontFamily: getFontFamily('heading'),
-  },
-  productImage: {
-    width: '100%',
-    height: 100,
-    borderRadius: 8,
-  },
-  loadingContainer: {
-    width: '100%',
-    alignItems: 'center',
-    paddingVertical: 20,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#666666',
-    marginTop: 10,
-  },
-  noProductsContainer: {
-    width: '100%',
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  noProductsText: {
-    fontSize: 18,
-    color: '#666666',
-    marginTop: 15,
-    marginBottom: 8,
-  },
-  noProductsSubText: {
-    fontSize: 14,
-    color: '#999999',
-    textAlign: 'center',
-  },
-  categoryFilters: {
-    alignItems: 'center',
-    paddingVertical: 10,
-    marginBottom: 15,
-  },
-  categoryScrollView: {
-    flexGrow: 0,
-    paddingHorizontal: 20,
-  },
-  categoryScrollContainer: {
-    paddingRight: 20, // Add right padding for last item
-    alignItems: 'center',
-  },
-  categoryButton: {
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#E0E0E0',
-    marginRight: 8, // Reduced from 10 to 8 for tighter spacing
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    minWidth: 80,
-  },
-  activeCategoryButton: {
-    backgroundColor: '#B62020',
-    borderColor: '#B62020',
-  },
-  categoryText: {
-    fontSize: 14,
-    color: '#333333',
-  },
-  activeCategoryText: {
-    color: '#FFFFFF',
-  },
-  categoryLoadingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#E0E0E0',
-    marginRight: 10,
-  },
-  categoryLoadingText: {
-    marginLeft: 10,
-    color: '#666666',
-    fontSize: 14,
-  },
+  footerLoad: { paddingVertical: theme.space.xl },
 });
 
 export default ProductsScreen;
