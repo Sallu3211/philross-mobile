@@ -114,7 +114,10 @@ workflows:
   android-release:
     name: PhilRoss Android Release (mirrors local build, optional)
     max_build_duration: 60
-    instance_type: linux_x2
+    # macOS, not linux_x2: Linux instances need a paid Codemagic plan and the
+    # build dies instantly with "instance type is not available with the current
+    # billing plan". This is why no Android release has ever built here.
+    instance_type: mac_mini_m2
     environment:
       groups:
         # Create this group in Codemagic UI and add:
@@ -135,13 +138,15 @@ workflows:
     scripts:
       - name: Install npm dependencies
         script: |
-          yarn install --frozen-lockfile
+          # Not --frozen-lockfile: yarn.lock is gitignored, so there is no
+          # lockfile in the repo for it to freeze against.
+          yarn install
       - name: Decode keystore
         script: |
           echo $CM_KEYSTORE | base64 --decode > android/app/philross.keystore
       - name: Build Android release bundle
         script: |
-          cd android && ./gradlew bundleRelease
+          cd android && chmod +x ./gradlew && ./gradlew bundleRelease
     artifacts:
       - android/app/build/outputs/**/*.aab
       - android/app/build/outputs/**/mapping.txt
