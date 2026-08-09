@@ -283,6 +283,35 @@ export const Phone: Icon = ({ size, color = INK }) => (
   </Base>
 );
 
+/** Three nodes joined by two links — the platform-neutral share mark. */
+export const Share: Icon = ({ size, color = INK }) => (
+  <Base size={size}>
+    <Path
+      d="M15.5 8.2a3.6 3.6 0 10-2.9-1.45L9.1 8.9a3.6 3.6 0 100 6.2l3.5 2.15a3.6 3.6 0 10.83-1.5l-3.5-2.15a3.6 3.6 0 000-1.2l3.5-2.15c.6.55 1.4.9 2.27.9z"
+      fill={color}
+    />
+  </Base>
+);
+
+/**
+ * Two offset sheets. Drawn as one path with an even-odd hole so the back sheet
+ * stays visible behind the front one at 18px, where a solid stack would blur
+ * into a single rectangle.
+ */
+export const Copy: Icon = ({ size, color = INK }) => (
+  <Base size={size}>
+    <Path
+      d="M9.2 2.4h7.4a4.4 4.4 0 014.4 4.4v7.4a4.4 4.4 0 01-4.4 4.4H9.2a4.4 4.4 0 01-4.4-4.4V6.8A4.4 4.4 0 019.2 2.4z"
+      fill={color}
+    />
+    <Path
+      d="M3.4 6.55A4.4 4.4 0 001 10.5v6.7a4.4 4.4 0 004.4 4.4h6.7a4.4 4.4 0 003.95-2.4H9.2a5.8 5.8 0 01-5.8-5.8V6.55z"
+      fill={color}
+      opacity={0.55}
+    />
+  </Base>
+);
+
 /* ── Forms ──────────────────────────────────────────────────────────────── */
 
 export const Mail: Icon = ({ size, color = INK }) => (
@@ -396,6 +425,8 @@ export const Icons = {
   LogOut,
   Star,
   Phone,
+  Copy,
+  Share,
   Search,
   Filter,
   MapPin,
