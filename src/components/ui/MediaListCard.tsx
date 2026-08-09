@@ -43,6 +43,12 @@ export interface MediaListCardProps {
   locked?: boolean;
   /** Small pill over the artwork, e.g. "Premium". */
   badge?: string;
+  /**
+   * 'cover' crops to fill — right for wide editorial thumbnails.
+   * 'contain' fits the whole image — right for product shots and book covers,
+   * which are portrait and lose their tops when cropped.
+   */
+  imageFit?: 'cover' | 'contain';
   onPress: () => void;
   style?: ViewStyle;
 }
@@ -57,6 +63,7 @@ export const MediaListCard: React.FC<MediaListCardProps> = ({
   progress,
   locked,
   badge,
+  imageFit = 'cover',
   onPress,
   style,
 }) => {
@@ -72,9 +79,11 @@ export const MediaListCard: React.FC<MediaListCardProps> = ({
       accessibilityRole="button"
       accessibilityLabel={`${title}${locked ? '. Locked.' : ''}`}
     >
-      <View style={styles.thumbWrap}>
+      <View
+        style={[styles.thumbWrap, imageFit === 'contain' && styles.thumbWrapContain]}
+      >
         {source ? (
-          <Image source={source} style={styles.thumb} resizeMode="cover" />
+          <Image source={source} style={styles.thumb} resizeMode={imageFit} />
         ) : (
           <View style={[styles.thumb, styles.thumbEmpty]} />
         )}
@@ -151,6 +160,11 @@ const styles = StyleSheet.create({
   thumbWrap: {
     width: 108,
     backgroundColor: theme.color.neutral[200],
+  },
+  /** White ground and padding so a contained image reads as product photography. */
+  thumbWrapContain: {
+    backgroundColor: theme.color.neutral[0],
+    padding: theme.space.sm,
   },
   thumb: { width: '100%', height: '100%' },
   thumbEmpty: { backgroundColor: theme.color.neutral[200] },

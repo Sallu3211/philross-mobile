@@ -3,13 +3,10 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Image,
   Linking,
   RefreshControl,
   StatusBar,
   StyleSheet,
-  Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,8 +15,9 @@ import { theme } from '../theme';
 import ScreenHeader from '../components/ui/ScreenHeader';
 import SearchBar from '../components/ui/SearchBar';
 import FilterChips from '../components/ui/FilterChips';
+import MediaListCard from '../components/ui/MediaListCard';
 import { EmptyState, LoadingState } from '../components/ui/StateView';
-import { ChevronRight, Shop } from '../components/ui/icons';
+import { Shop } from '../components/ui/icons';
 import { getProductList, getProductCategories } from '../../app/helpers/ApiHelper';
 import { pushCleverTapEvent } from '../../App';
 
@@ -330,8 +328,6 @@ const ProductsScreen = ({ navigation }: any) => {
         <FlatList
           data={products}
           keyExtractor={(item: any, i) => String(item?.id ?? i)}
-          numColumns={2}
-          columnWrapperStyle={styles.column}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           onEndReachedThreshold={0.4}
@@ -365,48 +361,15 @@ const ProductsScreen = ({ navigation }: any) => {
             ) : null
           }
           renderItem={({ item }: any) => (
-            <TouchableOpacity
-              style={styles.card}
+            <MediaListCard
+              title={item?.title ?? 'Untitled'}
+              body={item?.headline ?? item?.description}
+              imageUrl={item?.cropped_image_url}
+              // Product shots are portrait; cropping them cuts the tops off.
+              imageFit="contain"
+              price={money(item?.price)}
               onPress={() => handleProductClick(item)}
-              activeOpacity={0.88}
-              accessibilityRole="button"
-              accessibilityLabel={item?.title ?? 'Product'}
-            >
-              {/* Square frame with `contain`, not a cropped strip. Book covers
-                  are portrait; the old fixed 100pt "cover" cut their tops off. */}
-              <View style={styles.imageFrame}>
-                {item?.cropped_image_url ? (
-                  <Image
-                    source={{ uri: item.cropped_image_url }}
-                    style={styles.image}
-                    resizeMode="contain"
-                  />
-                ) : (
-                  <View style={styles.imageEmpty}>
-                    <Shop size={26} color={theme.color.text.disabled} />
-                  </View>
-                )}
-              </View>
-
-              <View style={styles.cardBody}>
-                <Text style={styles.cardTitle} numberOfLines={2}>
-                  {item?.title ?? 'Untitled'}
-                </Text>
-                {!!item?.headline && (
-                  <Text style={styles.cardSub} numberOfLines={2}>
-                    {item.headline}
-                  </Text>
-                )}
-                <View style={styles.cardFoot}>
-                  {money(item?.price) ? (
-                    <Text style={styles.price}>{money(item?.price)}</Text>
-                  ) : (
-                    <Text style={styles.priceMuted}>View</Text>
-                  )}
-                  <ChevronRight size={13} color={theme.color.text.disabled} />
-                </View>
-              </View>
-            </TouchableOpacity>
+            />
           )}
         />
       )}
