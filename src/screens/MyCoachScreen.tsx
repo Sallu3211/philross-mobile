@@ -1,37 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Platform,
-  Image,
-  Dimensions,
-  ActivityIndicator,
   Alert,
+  Image,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
-import { getFontFamily, getColors } from '../utils/platform';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import SideMenu from '../components/SideMenu';
-// Shared icon set, so the hamburger matches the one on the dashboard.
-import { Menu as MenuIcon } from '../components/ui/icons';
-import { theme as appTheme } from '../theme';
-import TickCircleIcon from '../../assets/icons/tick-circle.svg';
-import FeedIcon from '../../assets/icons/home.svg';
-import EventsIcon from '../../assets/icons/calendar.svg';
-import ProductsIcon from '../../assets/icons/bag-2.svg';
-import MyCoachIcon from '../../assets/icons/teacher-red.svg';
-import CoursesIcon from '../../assets/icons/teacher.svg';
-import { getCoachList, submitIntakeForm } from '../../app/helpers/ApiHelper';
-import { useUser } from '../context/UserContext';
-import { Loader } from '../components/Loader';
-
-const { width } = Dimensions.get('window');
+import { theme } from '../theme';
+import ScreenHeader from '../components/ui/ScreenHeader';
+import { ErrorState, LoadingState } from '../components/ui/StateView';
+import { Check, ChevronRight, Coach } from '../components/ui/icons';
+import { getCoachList } from '../../app/helpers/ApiHelper';
 
 const MyCoachScreen = ({ navigation }: any) => {
-  const colors = getColors();
-  const { user, getUserInitial, isLoggedIn } = useUser();
   const [showSideMenu, setShowSideMenu] = useState(false);
   const [coachData, setCoachData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -40,6 +26,8 @@ const MyCoachScreen = ({ navigation }: any) => {
   // Fetch coach data on component mount
   useEffect(() => {
     fetchCoachData();
+    // Mount-only; fetchCoachData closes over state it also sets.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Fetch coach data from API
@@ -88,354 +76,231 @@ const MyCoachScreen = ({ navigation }: any) => {
     }
   };
 
+  const plain = (html: unknown): string =>
+    String(html ?? '')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/p>/gi, '\n\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&#39;|&rsquo;/g, '’')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+
+  /** key_benefits arrives as an array, or as newline/bullet separated prose. */
+  const benefits: string[] = Array.isArray(coachData?.key_benefits)
+    ? coachData.key_benefits.map((b: any) => plain(b)).filter(Boolean)
+    : plain(coachData?.key_benefits)
+        .split('\n')
+        .map(s => s.replace(/^[-•*]\s*/, '').trim())
+        .filter(Boolean);
+
   return (
-    <>
-    <View style={styles.container}>
-      {/* Top Navigation */}
-      <View style={styles.topNav}>
-        <TouchableOpacity style={styles.menuButton} onPress={() => setShowSideMenu(true)}>
-          <MenuIcon size={22} color={appTheme.color.text.primary} />
-        </TouchableOpacity>
-        <Text style={[styles.title, { fontFamily: getFontFamily('bold') }]}>Personal Training</Text>
-        <TouchableOpacity style={styles.profileButton}>
-          <View style={styles.profileCircle}>
-            <Text style={[styles.profileInitial, { fontFamily: getFontFamily('bold') }]}>{isLoggedIn ? getUserInitial() : '?'}</Text>
-          </View>
-        </TouchableOpacity>
-      </View>
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <StatusBar barStyle="dark-content" backgroundColor={theme.color.surface.app} />
 
-      {/* Content */}
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Hero Image */}
-        <View style={styles.heroContainer}>
-            {coachData && <Image
-              source={{
-                uri: coachData?.cropped_image_url || 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?ixlib=rb-4.0.3&auto=format&fit=crop&w=1350&q=80'
-              }}
-              style={styles.heroImage}
+      <ScreenHeader title="My Coach" onMenu={() => setShowSideMenu(true)} />
+
+      {isLoading ? (
+        <LoadingState label="Loading" />
+      ) : error || !coachData ? (
+        <ErrorState
+          message={error ?? 'We could not load coaching details.'}
+          onRetry={fetchCoachData}
+        />
+      ) : (
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+        >
+          {!!coachData?.cropped_image_url && (
+            <Image
+              source={{ uri: coachData.cropped_image_url }}
+              style={styles.hero}
               resizeMode="cover"
-            />}
-        </View>
+            />
+          )}
 
-        {/* Main Content */}
-        <View style={styles.mainContent}>
-          {isLoading ? (
-            <View style={styles.loadingContainer}>
-              {/* <ActivityIndicator size="large" color="#B62020" />
-              <Text style={[styles.loadingText, { fontFamily: getFontFamily('body') }]}>
-                Loading coach information...
-              </Text> */}
-            </View>
-          ) : error ? (
-            <View style={styles.errorContainer}>
-              <Text style={[styles.errorText, { fontFamily: getFontFamily('body') }]}>
-                {error}
-              </Text>
-              <TouchableOpacity style={styles.retryButton} onPress={fetchCoachData}>
-                <Text style={[styles.retryButtonText, { fontFamily: getFontFamily('bold') }]}>
-                  Retry
-                </Text>
-              </TouchableOpacity>
-            </View>
-          ) : coachData ? (
-            <>
-              <Text style={[styles.mainTitle, { fontFamily: getFontFamily('bold') }]}>
-                {coachData.instructor?.full_name || coachData.instructor?.name || coachData.instructor?.title || coachData.headline}
-              </Text>
-              <Text style={[styles.description, { fontFamily: getFontFamily('body') }]}>
-                {coachData.instructor?.bio || coachData.instructor?.description || coachData.description}
-              </Text>
+          <Text style={styles.headline}>
+            {coachData?.headline || 'Train one to one with Master Phil'}
+          </Text>
 
-              {/* Key Benefits */}
-              {coachData.key_benefits && coachData.key_benefits.length > 0 && (
-                <>
-                  <Text style={[styles.sectionTitle, { fontFamily: getFontFamily('bold') }]}>
-                    Key Benefits
-                  </Text>
-                  
-                  <View style={styles.benefitsList}>
-                    {coachData.key_benefits.map((benefit: any, index: number) => (
-                      <View key={benefit.id || index} style={styles.benefitItem}>
-                        <TickCircleIcon width={20} height={20} />
-                        <Text style={[styles.benefitText, { fontFamily: getFontFamily('body') }]}>
-                          {benefit.name || 'Benefit'}
-                        </Text>
-                      </View>
-                    ))}
+          {!!plain(coachData?.description) && (
+            <Text style={styles.body}>{plain(coachData.description)}</Text>
+          )}
+
+          {benefits.length > 0 && (
+            <View style={styles.benefits}>
+              <Text style={styles.sectionLabel}>What you get</Text>
+              {benefits.map(b => (
+                <View key={b} style={styles.benefitRow}>
+                  <View style={styles.tick}>
+                    <Check size={11} color={theme.color.text.inverse} />
                   </View>
-                </>
-              )}
-
-              {/* Instructor */}
-              <Text style={[styles.sectionTitle, { fontFamily: getFontFamily('bold') }]}>
-                Instructor:
-              </Text>
-              <View style={styles.instructorContainer}>
-                <Image
-                  source={{
-                    uri: coachData?.cropped_instructor_image_url || 'https://randomuser.me/api/portraits/men/32.jpg'
-                  }}
-                  style={styles.instructorImage}
-                />
-                <Text style={[styles.instructorName, { fontFamily: getFontFamily('bold') }]}>
-                  {coachData?.instructor_name || 'Instructor Name Not Available'}
-                </Text>
-              </View>
-
-              {/* CTA Button */}
-              <TouchableOpacity style={styles.ctaButton} onPress={handleStartIntakeForm}>
-                <Text style={[styles.ctaButtonText, { fontFamily: getFontFamily('bold') }]}>
-                  Start Intake Form
-                </Text>
-              </TouchableOpacity>
-            </>
-          ) : ( !isLoading &&
-            <View style={styles.noDataContainer}>
-              <Text style={[styles.noDataText, { fontFamily: getFontFamily('body') }]}>
-                No coach information available
-              </Text>
+                  <Text style={styles.benefitText}>{b}</Text>
+                </View>
+              ))}
             </View>
           )}
-        </View>
-      </ScrollView>
 
-      {/* Bottom Navigation */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Feed')}>
-          <FeedIcon width={24} height={24} />
-          <Text style={[styles.navText, { fontFamily: getFontFamily('body') }]}>Feed</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Events')}>
-          <EventsIcon width={24} height={24} />
-          <Text style={[styles.navText, { fontFamily: getFontFamily('body') }]}>Events</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Products')}>
-          <ProductsIcon width={24} height={24} />
-          <Text style={[styles.navText, { fontFamily: getFontFamily('body') }]}>Products</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <MyCoachIcon width={24} height={24} />
-          <Text style={[styles.navText, styles.activeNavText, { fontFamily: getFontFamily('body') }]}>My Coach</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Courses')}>
-          <CoursesIcon width={24} height={24} />
-          <Text style={[styles.navText, { fontFamily: getFontFamily('body') }]}>Courses</Text>
-        </TouchableOpacity>
-      </View>
+          {/* The coach's own card — a name and face make a one-to-one
+              programme feel like a person rather than a product. */}
+          {(coachData?.instructor_name || coachData?.cropped_instructor_image_url) && (
+            <View style={styles.coachCard}>
+              {coachData?.cropped_instructor_image_url ? (
+                <Image
+                  source={{ uri: coachData.cropped_instructor_image_url }}
+                  style={styles.coachAvatar}
+                />
+              ) : (
+                <View style={[styles.coachAvatar, styles.coachAvatarFallback]}>
+                  <Coach size={20} color={theme.color.text.inverse} />
+                </View>
+              )}
+              <View style={styles.coachText}>
+                <Text style={styles.coachName} numberOfLines={1}>
+                  {coachData?.instructor_name ?? 'Master Phil Ross'}
+                </Text>
+                <Text style={styles.coachRole}>Your coach</Text>
+              </View>
+            </View>
+          )}
 
-      {/* Side Menu */}
-      <SideMenu 
-        isVisible={showSideMenu} 
-        onClose={() => setShowSideMenu(false)} 
+          <TouchableOpacity
+            style={styles.cta}
+            onPress={handleStartIntakeForm}
+            activeOpacity={0.9}
+            accessibilityRole="button"
+          >
+            <Text style={styles.ctaText}>Apply for coaching</Text>
+            <ChevronRight size={16} color={theme.color.text.onBrand} />
+          </TouchableOpacity>
+
+          <Text style={styles.fine}>
+            Tell us about your training and goals. Phil's team will get back to you.
+          </Text>
+        </ScrollView>
+      )}
+
+      <SideMenu
+        isVisible={showSideMenu}
+        onClose={() => setShowSideMenu(false)}
         navigation={navigation}
       />
-    </View>
-      {isLoading && (
-        <Loader value='Loading coach information...' />
-      )}
-    </>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  topNav: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 70 : 50,
-    paddingBottom: 20,
-  },
-  menuButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 18,
-    fontFamily: getFontFamily('bold'),
-    color: '#000000',
-    flex: 1,
-    textAlign: 'center',
-  },
-  profileButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  profileCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#000000',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  profileInitial: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontFamily: getFontFamily('bold'),
-  },
+  safe: { flex: 1, backgroundColor: theme.color.surface.app },
   content: {
-    flex: 1,
+    paddingHorizontal: theme.space.screen,
+    paddingBottom: theme.space['5xl'],
   },
-  heroContainer: {
+  hero: {
     width: '100%',
-    height: 220,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-  heroImage: {
-    width: '100%',
-    height: '100%',
+    aspectRatio: 16 / 9,
     borderRadius: 16,
+    backgroundColor: theme.color.neutral[200],
+    marginBottom: theme.space.xl,
   },
-  mainContent: {
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 20,
+  headline: {
+    fontFamily: theme.font.bold,
+    fontSize: theme.type.h1.fontSize,
+    lineHeight: theme.type.h1.lineHeight,
+    letterSpacing: theme.type.h1.letterSpacing,
+    color: theme.color.text.primary,
   },
-  mainTitle: {
-    fontSize: 24,
-    fontFamily: getFontFamily('bold'),
-    color: '#000000',
-    marginBottom: 12,
+  body: {
+    fontFamily: theme.font.regular,
+    fontSize: theme.type.body.fontSize,
+    lineHeight: 23,
+    color: theme.color.text.secondary,
+    marginTop: theme.space.md,
   },
-  description: {
-    fontSize: 16,
-    color: '#666666',
-    lineHeight: 24,
-    marginBottom: 32,
+
+  benefits: { marginTop: theme.space['2xl'], gap: theme.space.md },
+  sectionLabel: {
+    fontFamily: theme.font.semibold,
+    fontSize: theme.type.overline.fontSize,
+    letterSpacing: theme.type.overline.letterSpacing,
+    textTransform: 'uppercase',
+    color: theme.color.text.muted,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontFamily: getFontFamily('bold'),
-    color: '#000000',
-    marginBottom: 16,
-  },
-  benefitsList: {
-    marginBottom: 32,
-  },
-  benefitItem: {
-    flexDirection: 'row',
+  benefitRow: { flexDirection: 'row', alignItems: 'flex-start', gap: theme.space.md },
+  tick: {
+    width: 19,
+    height: 19,
+    borderRadius: 10,
+    backgroundColor: theme.color.status.success,
     alignItems: 'center',
-    marginBottom: 12,
+    justifyContent: 'center',
+    marginTop: 1,
   },
   benefitText: {
-    fontSize: 16,
-    color: '#000000',
-    marginLeft: 12,
+    flex: 1,
+    fontFamily: theme.font.regular,
+    fontSize: theme.type.bodySm.fontSize,
+    lineHeight: 20,
+    color: theme.color.text.secondary,
   },
-  instructorContainer: {
+
+  coachCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 40,
+    gap: theme.space.lg,
+    backgroundColor: theme.color.surface.card,
+    borderRadius: 16,
+    padding: theme.space.lg,
+    marginTop: theme.space['2xl'],
   },
-  instructorImage: {
+  coachAvatar: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    marginRight: 12,
-    borderWidth: 0.5,
-    borderColor: 'rgba(0, 0, 0, 0.1)',
+    backgroundColor: theme.color.neutral[200],
   },
-  instructorName: {
-    fontSize: 18,
-    fontFamily: getFontFamily('bold'),
-    color: '#000000',
-  },
-  debugText: {
-    fontSize: 12,
-    color: '#666666',
-    backgroundColor: '#F0F0F0',
-    padding: 10,
-    marginBottom: 10,
-    borderRadius: 5,
-    fontFamily: getFontFamily('body'),
-  },
-  ctaButton: {
-    backgroundColor: '#B62020',
-    borderRadius: 30,
-    paddingVertical: 12,
+  coachAvatarFallback: {
+    backgroundColor: theme.color.brand.base,
     alignItems: 'center',
-    marginHorizontal: 0,
-    marginBottom: 20,
+    justifyContent: 'center',
   },
-  ctaButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontFamily: getFontFamily('bold'),
+  coachText: { flex: 1, minWidth: 0 },
+  coachName: {
+    fontFamily: theme.font.semibold,
+    fontSize: theme.type.body.fontSize,
+    color: theme.color.text.primary,
   },
-  bottomNav: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    paddingBottom: Platform.OS === 'ios' ? 20 : 0,
-  },
-  navItem: {
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingBottom: 16,
-  },
-  navText: {
-    fontSize: 12,
-    color: '#666666',
-    marginTop: 4,
-  },
-  activeNavText: {
-    color: '#B62020',
-    fontFamily: getFontFamily('heading'),
-  },
-  loadingContainer: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#666666',
-    marginTop: 15,
-  },
-  errorContainer: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  errorText: {
-    fontSize: 16,
-    color: '#B62020',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  retryButton: {
-    backgroundColor: '#B62020',
-    borderRadius: 30,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-  },
-  retryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontFamily: getFontFamily('bold'),
-  },
-  noDataContainer: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  noDataText: {
-    fontSize: 16,
-    color: '#666666',
-    textAlign: 'center',
+  coachRole: {
+    fontFamily: theme.font.regular,
+    fontSize: theme.type.caption.fontSize,
+    color: theme.color.text.muted,
+    marginTop: 1,
   },
 
+  cta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.space.sm,
+    backgroundColor: theme.color.brand.base,
+    borderRadius: theme.radius.md,
+    minHeight: 54,
+    marginTop: theme.space['2xl'],
+  },
+  ctaText: {
+    fontFamily: theme.font.semibold,
+    fontSize: theme.type.h3.fontSize,
+    color: theme.color.text.onBrand,
+  },
+  fine: {
+    fontFamily: theme.font.regular,
+    fontSize: theme.type.caption.fontSize,
+    lineHeight: 18,
+    color: theme.color.text.muted,
+    textAlign: 'center',
+    marginTop: theme.space.md,
+  },
 });
 
 export default MyCoachScreen;

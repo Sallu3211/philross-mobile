@@ -1,26 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Platform,
-  Dimensions,
-  ActivityIndicator,
   Image,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
-import { getFontFamily, getColors } from '../utils/platform';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import DeviceInfo from 'react-native-device-info';
-import TickCircleIcon from '../../assets/icons/tick-circle.svg';
-import HomeIcon from '../../assets/icons/home.svg';
-import EventsIcon from '../../assets/icons/calendar.svg';
-import ProductsIcon from '../../assets/icons/bag-2.svg';
-import MyCoachIcon from '../../assets/icons/weight.svg';
-import CoursesIcon from '../../assets/icons/teacher.svg';
-import ArrowLeftIcon from '../../assets/icons/arrow-left.svg';
-
-const { width, height } = Dimensions.get('window');
+import { theme } from '../theme';
+import ScreenHeader from '../components/ui/ScreenHeader';
+import { EmptyState, LoadingState } from '../components/ui/StateView';
+import { Info } from '../components/ui/icons';
 
 const AboutScreen = ({ navigation }: any) => {
   const [aboutData, setAboutData] = useState<any>(null);
@@ -62,279 +54,107 @@ const AboutScreen = ({ navigation }: any) => {
     }
   };
 
-  const handleBack = () => {
-    navigation.goBack();
-  };
+  /** The API returns prose that may carry basic HTML; strip tags for display. */
+  const plain = (html: unknown): string =>
+    String(html ?? '')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/p>/gi, '\n\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&#39;|&rsquo;/g, '’')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+
+  const body = plain(aboutData?.content);
 
   return (
-    <View style={styles.container}>
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.topNav}>
-          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-            <ArrowLeftIcon width={24} height={24} />
-          </TouchableOpacity>
-          <Text style={[styles.header]}>About</Text>
-          <TouchableOpacity style={styles.shareButton} />
-        </View>
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <StatusBar barStyle="dark-content" backgroundColor={theme.color.surface.app} />
 
-        {/* Main Image */}
-        <View style={styles.imageContainer}>
-          <View style={styles.mainImage}>
-            {aboutData?.thumbnail_url ? (
-              <Image 
-                source={{ uri: aboutData.thumbnail_url }}
-                style={styles.profileImage}
-                resizeMode="cover"
-              />
-            ) : (
-              <View style={styles.imagePlaceholder}>
-                <Text style={styles.placeholderText}>Loading Image...</Text>
-              </View>
-            )}
-          </View>
-        </View>
+      <ScreenHeader title="About Phil" onBack={() => navigation.goBack()} />
 
-        {/* Biography Section */}
-        <View style={styles.bioSection}>
-          {isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#B62020" />
-              <Text style={[styles.loadingText, { fontFamily: getFontFamily('body') }]}>
-                Loading About Us content...
-              </Text>
-            </View>
-          ) : (
-            <>
-              <Text style={styles.nameHeading}>
-                {aboutData?.heading ? 
-                  aboutData.heading.replace(/<[^>]*>/g, '') : 
-                  'Phil Ross'
-                }
-              </Text>
-              
-              <Text style={styles.bioText}>
-                {aboutData?.content ? 
-                  aboutData.content.replace(/<[^>]*>/g, '') : 
-                  'Master Phil is a highly accomplished martial artist with over 50 years of experience across multiple disciplines. He holds black belts in Brazilian Jiu-Jitsu, Lethwei, Taekwondo, and Bando, and is a Master Kettlebell Instructor.'
-                }
-              </Text>
-              
-              <Text style={styles.bioText}>
-                A former kickboxing and grappling champion, Division 1 wrestler, certified USA boxing coach, bodyguard, and trainer for professional athletes, law enforcement, and military special forces. His dedication to health, fitness, and self-reliance has earned him numerous accolades, including induction into the Black Belt Hall of Fame.
-              </Text>
-            </>
-          )}
-        </View>
-
-        {/* Core Principles Section */}
-        <View style={styles.principlesSection}>
-          <Text style={styles.principlesHeading}>Our Core Principles</Text>
-          
-          <View style={styles.principlesList}>
-            <View style={styles.principleItem}>
-              <TickCircleIcon width={20} height={20} />
-              <Text style={styles.principleText}>Discipline</Text>
-            </View>
-            
-            <View style={styles.principleItem}>
-              <TickCircleIcon width={20} height={20} />
-              <Text style={styles.principleText}>Strength</Text>
-            </View>
-            
-            <View style={styles.principleItem}>
-              <TickCircleIcon width={20} height={20} />
-              <Text style={styles.principleText}>Resilience</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Call to Action Button */}
-        <TouchableOpacity 
-          style={styles.exploreButton}
-          onPress={() => navigation.navigate('Courses')}
+      {isLoading ? (
+        <LoadingState label="Loading" />
+      ) : (
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.exploreButtonText}>EXPLORE COURSES</Text>
-        </TouchableOpacity>
+          {!!aboutData?.thumbnail_url && (
+            <Image
+              source={{ uri: aboutData.thumbnail_url }}
+              style={styles.hero}
+              resizeMode="cover"
+            />
+          )}
 
-        {/* App Version Information */}
-        <Text style={styles.versionText}>Version {appVersion} ({buildNumber})</Text>
-      </ScrollView>
+          <Text style={styles.heading}>
+            {aboutData?.heading || 'Master Phil Ross'}
+          </Text>
 
-      {/* Bottom Navigation */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Feed')}>
-          <HomeIcon width={24} height={24} />
-          <Text style={[styles.navText, { fontFamily: getFontFamily('body') }]}>Feed</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Events')}>
-          <EventsIcon width={24} height={24} />
-          <Text style={[styles.navText, { fontFamily: getFontFamily('body') }]}>Events</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Products')}>
-          <ProductsIcon width={24} height={24} />
-          <Text style={[styles.navText, { fontFamily: getFontFamily('body') }]}>Products</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('MyCoach')}>
-          <MyCoachIcon width={24} height={24} />
-          <Text style={[styles.navText, { fontFamily: getFontFamily('body') }]}>My Coach</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Courses')}>
-          <CoursesIcon width={24} height={24} />
-          <Text style={[styles.navText, { fontFamily: getFontFamily('body') }]}>Courses</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+          {body ? (
+            <Text style={styles.body}>{body}</Text>
+          ) : (
+            <EmptyState
+              icon={Info}
+              title="Nothing here yet"
+              body="Phil's story will appear here soon."
+            />
+          )}
+
+          <View style={styles.footer}>
+            <Text style={styles.version}>
+              {appVersion
+                ? `Version ${appVersion}${buildNumber ? ` (${buildNumber})` : ''}`
+                : ''}
+            </Text>
+          </View>
+        </ScrollView>
+      )}
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  topNav: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingTop: Platform.OS === 'ios' ? 70 : 50,
-    paddingBottom: 20,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-  },
-  shareButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'flex-end',
-  },
+  safe: { flex: 1, backgroundColor: theme.color.surface.app },
   content: {
-    flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: theme.space.screen,
+    paddingBottom: theme.space['5xl'],
   },
-  header: {
-    fontSize: 20,
-    color: '#000000',
-    textAlign: 'center',
-    fontFamily: getFontFamily('heading'),
-  },
-  imageContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  mainImage: {
-    width: width * 0.92,
-    height: width * 0.45,
+  hero: {
+    width: '100%',
+    aspectRatio: 16 / 9,
     borderRadius: 16,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
+    backgroundColor: theme.color.neutral[200],
+    marginBottom: theme.space.xl,
   },
-  profileImage: {
-    width: '100%',
-    height: '100%',
+  heading: {
+    fontFamily: theme.font.bold,
+    fontSize: theme.type.display.fontSize,
+    lineHeight: theme.type.display.lineHeight,
+    letterSpacing: theme.type.display.letterSpacing,
+    color: theme.color.text.primary,
+    marginBottom: theme.space.lg,
   },
-  imagePlaceholder: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F0F0F0',
+  body: {
+    fontFamily: theme.font.regular,
+    fontSize: theme.type.body.fontSize,
+    // Looser than the app default: this is the one screen of long-form reading.
+    lineHeight: 24,
+    color: theme.color.text.secondary,
   },
-  placeholderText: {
-    color: '#888888',
-    fontSize: 14,
+  footer: {
+    marginTop: theme.space['4xl'],
+    paddingTop: theme.space.xl,
+    borderTopWidth: 1,
+    borderTopColor: theme.color.border.subtle,
   },
-  bioSection: {
-    marginBottom: 25,
-  },
-  nameHeading: {
-    fontSize: 24,
-    color: '#000000',
-    marginBottom: 15,
-    fontFamily: getFontFamily('bold'),
-  },
-  bioText: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: '#333333',
-    marginBottom: 12,
-    fontFamily: getFontFamily('body'),
-  },
-  principlesSection: {
-    marginBottom: 25,
-  },
-  principlesHeading: {
-    fontSize: 18,
-    color: '#000000',
-    marginBottom: 15,
-    fontFamily: getFontFamily('bold'),
-  },
-  principlesList: {
-    gap: 10,
-  },
-  principleItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  principleText: {
-    fontSize: 14,
-    color: '#333333',
-    marginLeft: 10,
-    fontFamily: getFontFamily('body'),
-  },
-  exploreButton: {
-    backgroundColor: '#B62020',
-    paddingVertical: 12,
-    paddingHorizontal: 25,
-    borderRadius: 20,
-    alignItems: 'center',
-    marginBottom: 30,
-  },
-  exploreButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontFamily: getFontFamily('bold'),
-  },
-  bottomNav: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    paddingBottom: Platform.OS === 'ios' ? 20 : 0,
-  },
-  navItem: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingBottom: 16,
-  },
-  navText: {
-    fontSize: 12,
-    color: '#666666',
-    marginTop: 4,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 20,
-  },
-  loadingText: {
-    marginTop: 10,
-    color: '#666666',
-  },
-  versionText: {
-    fontSize: 14,
-    color: '#666666',
-    fontFamily: getFontFamily('body'),
+  version: {
+    fontFamily: theme.font.regular,
+    fontSize: theme.type.caption.fontSize,
+    color: theme.color.text.disabled,
     textAlign: 'center',
-    marginBottom: 20,
   },
 });
 
