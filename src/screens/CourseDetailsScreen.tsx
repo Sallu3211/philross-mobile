@@ -1,1564 +1,844 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Platform,
-  Image,
-  Dimensions,
   Alert,
-  Linking,
   Clipboard,
+  Image,
+  Linking,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  Share as RNShare,
+  StatusBar,
+  StyleSheet,
+  Text,
   ToastAndroid,
-  Share,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { getFontFamily, getColors } from '../utils/platform';
-import ArrowLeftIcon from '../../assets/icons/arrow-left.svg';
-import ShareIcon from '../../assets/icons/Icon.svg';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import EncryptedStorage from 'react-native-encrypted-storage';
+import Orientation from 'react-native-orientation-locker';
+import { theme } from '../theme';
+import ScreenHeader from '../components/ui/ScreenHeader';
+import { ErrorState, LoadingState } from '../components/ui/StateView';
+import LinearMeter from '../components/ui/LinearMeter';
+import { Check, Close, Copy, Play, Share, User } from '../components/ui/icons';
+import { VideoPlayerNew } from '../components/VideoPlayer';
+import { getCourseDetail, updateVideoProgress } from '../../app/helpers/ApiHelper';
 import FbIcon from '../../assets/icons/facebook.png';
 import WhatsAppIcon from '../../assets/icons/whatsapp.png';
 import InstagramIcon from '../../assets/icons/instagram.png';
 import XIcon from '../../assets/icons/x_icon.png';
 import TelegramIcon from '../../assets/icons/telegram.png';
-import Utils from '../../app/helpers/Utilities';
-import share from '../../assets/icons/share.png';
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import DocumentCopyIcon from '../../assets/icons/document-copy.svg';
-import RedPlayIcon from '../../assets/icons/solar_play-bold-1.svg';
-import { getCourseDetail, enrollInCourse, updateVideoProgress, } from '../../app/helpers/ApiHelper';
-import EncryptedStorage from 'react-native-encrypted-storage';
-import Orientation from 'react-native-orientation-locker';
-import { VideoPlayerNew } from '../components/VideoPlayer';
 
-const { width, height } = Dimensions.get('window');
+const ANDROID_APP_URL =
+  'https://play.google.com/store/apps/details?id=com.philross';
+const IOS_APP_URL = 'https://apps.apple.com/us/app/philross/id6751194230';
 
-interface CourseModule {
-  id: string;
-  title: string;
-  duration: string;
-  completed?: boolean;
-}
+/** A video counts as watched at 90% — credits and outros are not content. */
+const COMPLETE_AT = 90;
+
+const toast = (message: string) => {
+  if (Platform.OS === 'android') {
+    ToastAndroid.show(message, ToastAndroid.SHORT);
+  } else {
+    Alert.alert('Copied', message);
+  }
+};
+
+const plain = (value: unknown): string => {
+  const text = Array.isArray(value) ? value.join(' ') : String(value ?? '');
+  return text
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&#39;|&rsquo;/g, '’')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+};
+
+const SOCIALS = [
+  { key: 'facebook', label: 'Facebook', png: FbIcon },
+  { key: 'whatsapp', label: 'WhatsApp', png: WhatsAppIcon },
+  { key: 'instagram', label: 'Instagram', png: InstagramIcon },
+  { key: 'twitter', label: 'X', png: XIcon },
+  { key: 'telegram', label: 'Telegram', png: TelegramIcon },
+];
 
 const CourseDetailsScreen = ({ route, navigation }: any) => {
-  const colors = getColors();
-  
-  // Get course ID and slug from route params
-  const { courseId, courseSlug } = route.params || {};
-  
-  // Course API state
-  const [courseData, setCourseData] = useState<any>(null);
-  const [isLoadingCourse, setIsLoadingCourse] = useState(false);
-  const [isEnrolled, setIsEnrolled] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
-  
-  // Share modal state
-  const [showShare, setShowShare] = useState(false);
-  
-  // Video player state
-  const [showVideoModal, setShowVideoModal] = useState(false);
-  const [selectedVideo, setSelectedVideo] = useState<any>(null);
-  const [isVideoLoading, setIsVideoLoading] = useState(false);
-  const [courseProgress, setCourseProgress] = useState(0);
-  const videoPlayerRef = useRef<VideoPlayerRef>(null);
-  
-  // Enrollment state
-  const [isEnrolling, setIsEnrolling] = useState(false);
+  const { courseId, courseSlug } = route.params || {};
 
+  const [courseData, setCourseData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isEnrolled, setIsEnrolled] = useState(false);
+  const [courseProgress, setCourseProgress] = useState(0);
+  /** video id → watched percentage, so each row can show its own state. */
+  const [videoProgress, setVideoProgress] = useState<Record<string, number>>({});
+
+  const [showShare, setShowShare] = useState(false);
+  const [selectedVideo, setSelectedVideo] = useState<any>(null);
+
+  // The player goes landscape; the rest of the app does not.
   useEffect(() => {
     Orientation.unlockAllOrientations();
-    return () => {
-      Orientation.lockToPortrait();
-    };
+    return () => Orientation.lockToPortrait();
   }, []);
 
-  // Fetch course details when component mounts
-  useEffect(() => {
-    if (courseId && courseSlug) {
-      fetchCourseDetails();
-    } else {
-      setError('No course ID or slug provided');
-    }
-  }, [courseId, courseSlug]);
-
-  // Load progress when course data is available
-  useEffect(() => {
-    if (courseData && isEnrolled) {
-      console.log('🔄 Course data loaded, fetching progress...');
-      fetchCourseProgress();
-    }
-  }, [courseData?.id, isEnrolled,]); // Fixed: use courseData.id and include fetchCourseProgress
-
-  // Check for existing progress when component mounts
-  useEffect(() => {
-    const checkExistingProgress = async () => {
-      if (courseId && !isLoadingCourse) {
-        console.log('🔄 Checking for existing progress...');
-        try {
-          const courseProgressKey = `course_progress_${courseId}`;
-          const storedProgress = await EncryptedStorage.getItem(courseProgressKey);
-          
-          if (storedProgress) {
-            const progressData = JSON.parse(storedProgress);
-            console.log('📊 Found existing progress:', progressData);
-            setCourseProgress(progressData.progress || 0);
-          }
-        } catch (error) {
-          console.log('❌ Error checking existing progress:', error);
-        }
-      }
-    };
-    
-    checkExistingProgress();
-  }, [courseId, isLoadingCourse]);
-
-
-
-  // Add focus listener to check enrollment status and load progress when screen comes into focus
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', async () => {
-      console.log('🔄 Screen focused, checking enrollment status and loading progress...');
-      if (courseData) {
-        // Re-check enrollment status when screen comes into focus
-        if (courseData.is_enrolled || await getLocalEnrollmentStatus(courseData.id)) {
-          console.log('✅ User is enrolled (from focus listener)');
-          setIsEnrolled(true);
-          // Load progress from local storage when returning to screen
-          await fetchCourseProgress();
-        }
-      }
-    });
-    
-    return unsubscribe;
-  }, [navigation, courseData]);
-
-  // Fetch course details from API
-  const fetchCourseDetails = async () => {
+  const readEnrollment = useCallback(async (id: string): Promise<boolean> => {
     try {
-      setIsLoadingCourse(true);
-      setError(null);
-      
-      const response = await getCourseDetail(courseId, courseSlug, navigation);
-      
-      console.log('🔍 API Response:', response);
-      console.log('🔍 Response type:', typeof response);
-      console.log('🔍 Response keys:', response ? Object.keys(response) : 'No response');
-      
-      let courseDataToSet: any = null;
-      
-      // Handle the actual API response structure: {data: {...}, status: true}
-      if (response?.status && response?.data) {
-        courseDataToSet = response.data;
-        console.log('✅ Using response.status + response.data');
-      } else if (response?.success && response?.data) {
-        courseDataToSet = response.data;
-        console.log('✅ Using response.success + response.data');
-      } else if (response?.data) {
-        courseDataToSet = response.data;
-        console.log('✅ Using response.data (no status/success)');
-      } else if (response && typeof response === 'object') {
-        courseDataToSet = response;
-        console.log('✅ Using direct response object');
-      } else {
-        console.log('❌ No valid data structure found');
-        setError('Failed to load course details');
-        return;
-      }
-      
-      console.log('🔍 Course data to set:', courseDataToSet);
-      console.log('🔍 Course videos:', courseDataToSet?.course_videos);
-      console.log('🔍 Course videos length:', courseDataToSet?.course_videos?.length);
-      
-      setCourseData(courseDataToSet);
-      
-      // Check enrollment status after setting course data
-      await checkEnrollmentStatus(courseDataToSet);
-      
-    } catch (error) {
-      console.error('❌ Error fetching course details:', error);
-      setError('Failed to load course details');
-    } finally {
-      setIsLoadingCourse(false);
+      const data = await EncryptedStorage.getItem(`enrolled_${id}`);
+      return data ? !!JSON.parse(data).isEnrolled : false;
+    } catch (e) {
+      return false;
     }
-  };
+  }, []);
 
-  // Function to save enrollment status locally
-  const saveEnrollmentStatus = async (courseId: string, isEnrolled: boolean) => {
+  const writeEnrollment = useCallback(async (id: string) => {
     try {
-      const key = `enrolled_${courseId}`;
-      await EncryptedStorage.setItem(key, JSON.stringify({ isEnrolled, timestamp: Date.now() }));
-      console.log('✅ Enrollment status saved locally for course:', courseId);
-    } catch (error) {
-      console.log('❌ Error saving enrollment status locally:', error);
-    }
-  };
-
-  // Function to get enrollment status locally
-  const getLocalEnrollmentStatus = async (courseId: string): Promise<boolean> => {
-    try {
-      const key = `enrolled_${courseId}`;
-      const data = await EncryptedStorage.getItem(key);
-      if (data) {
-        const parsed = JSON.parse(data);
-        console.log('✅ Local enrollment status found for course:', courseId, parsed);
-        return parsed.isEnrolled;
-      }
-    } catch (error) {
-      console.log('❌ Error getting local enrollment status:', error);
-    }
-    return false;
-  };
-
-  // Function to check enrollment status
-  const checkEnrollmentStatus = async (courseData: any) => {
-    if (!courseData) return;
-    
-    console.log('🔍 Checking enrollment status for course:', courseData.title);
-    console.log('🔍 Course data is_enrolled:', courseData.is_enrolled);
-    console.log('🔍 Course data is_paid_course:', courseData.is_paid_course);
-    console.log('🔍 Course data is_locked:', courseData.is_locked);
-    console.log('🔍 Course data course_videos:', courseData.course_videos?.length || 0);
-    
-    // First check local storage for enrollment status
-    const localEnrollmentStatus = await getLocalEnrollmentStatus(courseData.id);
-    if (localEnrollmentStatus) {
-      console.log('✅ User is enrolled (from local storage)');
-      setIsEnrolled(true);
-      await fetchCourseProgress();
-      return;
-    }
-    
-    // Check if user is enrolled from course data
-    if (courseData.is_enrolled) {
-      console.log('✅ User is enrolled (from is_enrolled flag)');
-      setIsEnrolled(true);
-      await saveEnrollmentStatus(courseData.id, true);
-      await fetchCourseProgress();
-      return;
-    }
-    
-    // Also check if user has any progress (indicates enrollment)
-    if (courseData.course_videos && courseData.course_videos.length > 0) {
-      // Check if any video has progress data
-      const hasProgress = courseData.course_videos.some((video: any) => 
-        video.watch_percentage || video.is_completed
+      await EncryptedStorage.setItem(
+        `enrolled_${id}`,
+        JSON.stringify({ isEnrolled: true, timestamp: Date.now() }),
       );
-      if (hasProgress) {
-        console.log('✅ User is enrolled (from video progress)');
-        setIsEnrolled(true);
-        await saveEnrollmentStatus(courseData.id, true);
-        await fetchCourseProgress();
-        return;
-      }
+    } catch (e) {
+      // Local cache only; the API remains the source of truth.
     }
-    
-    // Check if this is a free course (free courses might not have enrollment flag)
-    if (!courseData.is_paid_course && !courseData.is_locked) {
-      console.log('✅ Free course - user should have access');
-      setIsEnrolled(true);
-      await saveEnrollmentStatus(courseData.id, true);
-      await fetchCourseProgress();
+  }, []);
+
+  /**
+   * Progress lives in local storage, keyed per video. The backend has no
+   * progress GET, so this is the only record of what has been watched.
+   */
+  const loadProgress = useCallback(
+    async (course: any) => {
+      const videos: any[] = course?.course_videos ?? [];
+      if (!courseId || videos.length === 0) return;
+
+      const map: Record<string, number> = {};
+      let watchedSum = 0;
+      let completed = 0;
+
+      for (const video of videos) {
+        try {
+          const stored = await EncryptedStorage.getItem(
+            `video_progress_${courseId}_${video.id}`,
+          );
+          if (!stored) continue;
+          const parsed = JSON.parse(stored);
+          const pct = Number(parsed.watch_percentage) || 0;
+          map[String(video.id)] = pct;
+          watchedSum += pct;
+          if (parsed.is_completed || pct >= COMPLETE_AT) completed++;
+        } catch (e) {
+          // A single unreadable key should not sink the whole calculation.
+        }
+      }
+
+      setVideoProgress(map);
+      setCourseProgress(
+        Math.max(watchedSum / videos.length, (completed / videos.length) * 100),
+      );
+    },
+    [courseId],
+  );
+
+  const resolveEnrollment = useCallback(
+    async (course: any) => {
+      if (!course) return;
+
+      const locallyEnrolled = await readEnrollment(course.id);
+      const hasServerFlag = !!course.is_enrolled;
+      const isFree = !course.is_paid_course && !course.is_locked;
+      const hasWatched = (course.course_videos ?? []).some(
+        (v: any) => v.watch_percentage || v.is_completed,
+      );
+
+      const enrolled = locallyEnrolled || hasServerFlag || isFree || hasWatched;
+      setIsEnrolled(enrolled);
+
+      if (enrolled) {
+        if (!locallyEnrolled) await writeEnrollment(course.id);
+        await loadProgress(course);
+      }
+    },
+    [readEnrollment, writeEnrollment, loadProgress],
+  );
+
+  const fetchCourseDetails = useCallback(async () => {
+    if (!courseId || !courseSlug) {
+      setError('This course could not be opened.');
+      setIsLoading(false);
       return;
     }
-    
-    // For paid courses, check if user has any enrollment history or progress
-    if (courseData.is_paid_course || courseData.is_locked) {
-      console.log('🔍 Paid course detected, checking for enrollment history...');
-      
-      // Try to fetch course progress to see if user has any history
-      try {
-        await fetchCourseProgress();
-        if (courseProgress > 0) {
-          console.log('✅ User has progress in paid course, considering enrolled');
-          setIsEnrolled(true);
-          await saveEnrollmentStatus(courseData.id, true);
-          return;
-        }
-      } catch (error) {
-        console.log('❌ Error checking progress for paid course:', error);
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const response = await getCourseDetail(courseId, courseSlug, navigation);
+
+      const data =
+        response?.data ??
+        (response && typeof response === 'object' ? response : null);
+
+      if (!data) {
+        setError('We could not load this course.');
+        return;
       }
-      
-      // Also check if user has any video progress in local storage
-      if (courseData.course_videos && courseData.course_videos.length > 0) {
-        let hasLocalProgress = false;
-        for (const video of courseData.course_videos) {
-          try {
-            const videoProgressKey = `video_progress_${courseData.id}_${video.id}`;
-            const storedProgress = await EncryptedStorage.getItem(videoProgressKey);
-            if (storedProgress) {
-              hasLocalProgress = true;
-              break;
-            }
-          } catch (error) {
-            console.log(`❌ Error checking local progress for video ${video.id}:`, error);
-          }
-        }
-        
-        if (hasLocalProgress) {
-          console.log('✅ User has local progress in paid course, considering enrolled');
-          setIsEnrolled(true);
-          await saveEnrollmentStatus(courseData.id, true);
-          await fetchCourseProgress();
-          return;
-        }
-      }
+
+      setCourseData(data);
+      await resolveEnrollment(data);
+    } catch (e) {
+      setError('We could not load this course.');
+    } finally {
+      setIsLoading(false);
     }
-    
-    console.log('❌ User is not enrolled');
-    setIsEnrolled(false);
+  }, [courseId, courseSlug, navigation, resolveEnrollment]);
+
+  useEffect(() => {
+    fetchCourseDetails();
+  }, [fetchCourseDetails]);
+
+  // Coming back from the player should show the progress it just recorded.
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      if (courseData) loadProgress(courseData);
+    });
+    return unsubscribe;
+  }, [navigation, courseData, loadProgress]);
+
+  const openLink = async (url?: string) => {
+    if (!url) {
+      Alert.alert('Unavailable', 'Enrolment for this course is not open yet.');
+      return;
+    }
+    try {
+      await Linking.openURL(url);
+    } catch (e) {
+      Alert.alert('Unavailable', 'We could not open the enrolment link.');
+    }
   };
 
-  const handleBack = () => {
-    navigation.goBack();
+  const videoUrlOf = (video: any): string =>
+    video?.video || video?.video_url || video?.url || video?.video_link || '';
+
+  const handlePlayVideo = (video: any) => {
+    if (!videoUrlOf(video)) {
+      Alert.alert('Unavailable', 'This video is not ready to play yet.');
+      return;
+    }
+    setSelectedVideo(video);
   };
 
-  const handleShare = () => {
-    setShowShare(true);
-  };
+  /** One writer for both the periodic update and the end-of-video call. */
+  const recordProgress = useCallback(
+    async (video: any, percent: number, completed: boolean) => {
+      const payload = {
+        video_id: video.id,
+        course_id: courseId,
+        watch_percentage: Math.round(percent),
+        is_completed: completed,
+      };
+      try {
+        await EncryptedStorage.setItem(
+          `video_progress_${courseId}_${video.id}`,
+          JSON.stringify({ ...payload, timestamp: Date.now() }),
+        );
+        setVideoProgress(prev => ({
+          ...prev,
+          [String(video.id)]: Math.round(percent),
+        }));
+        await updateVideoProgress(payload, navigation);
+      } catch (e) {
+        // Progress is best-effort; never interrupt playback for it.
+      }
+    },
+    [courseId, navigation],
+  );
+
+  const shareLink = courseData?.slug
+    ? `https://philrossapp.link/course/${courseData.slug}`
+    : 'https://philrossapp.link';
 
   const handleSocialShare = async (platform: string) => {
-    const androidAppUrl = 'https://play.google.com/store/apps/details?id=com.philross';
-    const iosAppUrl = 'https://apps.apple.com/us/app/philross/id6751194230';
-    const shareMessage = `Master Phil App – Train Smarter. Get Stronger.\nUnlock expert training, fitness routines & the BodyBell Method® – anytime, anywhere!\n\nDownload now:\nAndroid: ${androidAppUrl}\niOS: ${iosAppUrl}`;
-    let shareUrl = '';
+    const message = `${courseData?.title ?? 'Master Phil'}\n${shareLink}\n\nGet the Master Phil app:\nAndroid: ${ANDROID_APP_URL}\niOS: ${IOS_APP_URL}`;
 
-    switch (platform) {
-      case 'facebook':
-        shareUrl = `https://www.facebook.com/sharer/sharer.php?quote=${encodeURIComponent(shareMessage)}`;
-        break;
-      case 'whatsapp':
-        shareUrl = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
-        break;
-      case 'twitter':
-        shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareMessage)}`;
-        break;
-      case 'telegram':
-        shareUrl = `tg://msg?text=${encodeURIComponent(shareMessage)}`;
-        break;
-      case 'instagram':
-        try {
-          await Clipboard.setString(shareMessage);
-          if (Platform.OS === 'android') {
-            ToastAndroid.show('Message copied to clipboard', ToastAndroid.SHORT);
-          } else {
-            Alert.alert('Message Copied', 'Master Phil app message copied to clipboard.');
-          }
-        } catch (e) {
-          console.log('Copy failed:', e);
-        }
-        return;
-      default:
-        return;
+    if (platform === 'instagram') {
+      Clipboard.setString(message);
+      toast('Link copied — paste it into Instagram');
+      return;
     }
 
-    if (shareUrl) {
-      try {
-        await Linking.openURL(shareUrl);
-      } catch (error) {
-        console.log('Failed to open URL:', error);
-        await Share.share({ message: shareMessage });
-      }
-    }
-  };
-
-  const handlePlayVideo = (moduleId: string) => {
-    console.log('🔍 Play button clicked for moduleId:', moduleId);
-    console.log('🔍 Current courseData:', courseData);
-    console.log('🔍 Course videos array:', courseData?.course_videos);
-    
-    // Find the video data for the selected module
-    const video = courseData?.course_videos?.find((v: any) => v.id === moduleId);
-    console.log('🔍 Found video:', video);
-    
-    if (video) {
-      console.log('✅ Video found:', video);
-      console.log('✅ Video ID:', video.id);
-      console.log('✅ Video Title:', video.title);
-      console.log('✅ Video URL field:', video.video);
-      
-      // Get video URL from backend data - using the correct field name 'video'
-      const videoUrl = video.video || video.video_url || video.url || video.video_link;
-      console.log('🔗 Final video URL:', videoUrl);
-      
-      if (videoUrl) {
-        console.log('🔗 Opening video player for URL:', videoUrl);
-        // Set selected video and open video modal
-        setSelectedVideo(video);
-        setShowVideoModal(true);
-      } else {
-        console.log('❌ No video URL found in video data');
-        console.log('❌ Video object keys:', Object.keys(video));
-        Alert.alert('Error', 'Video URL not available');
-      }
-    } else {
-      console.log('❌ Video not found for moduleId:', moduleId);
-      console.log('❌ Available videos:', courseData?.course_videos);
-      Alert.alert('Error', 'Video not found');
-    }
-  };
-
-  const fetchCourseProgress = useCallback(async () => {
-    if (!courseId || !courseData?.course_videos) return;
-    
-    try {
-      console.log('📊 Calculating course progress from video data...');
-      
-      // Get progress from local storage for each video
-      let totalProgress = 0;
-      let completedVideos = 0;
-      
-      for (const video of courseData.course_videos) {
-        try {
-          const videoProgressKey = `video_progress_${courseId}_${video.id}`;
-          const storedProgress = await EncryptedStorage.getItem(videoProgressKey);
-          
-          if (storedProgress) {
-            const videoData = JSON.parse(storedProgress);
-            const watchPercentage = videoData.watch_percentage || 0;
-            const isCompleted = videoData.is_completed || false;
-            
-            totalProgress += watchPercentage;
-            
-            if (isCompleted || watchPercentage >= 90) {
-              completedVideos++;
-            }
-            
-            console.log(`📊 Video ${video.id}: ${watchPercentage}% completed, isCompleted: ${isCompleted}`);
-          }
-        } catch (error) {
-          console.log(`❌ Error getting progress for video ${video.id}:`, error);
-        }
-      }
-      
-      // Calculate overall course progress
-      const totalVideos = courseData.course_videos.length;
-      const averageProgress = totalVideos > 0 ? totalProgress / totalVideos : 0;
-      const completionProgress = totalVideos > 0 ? (completedVideos / totalVideos) * 100 : 0;
-      
-      // Use the higher of average progress or completion progress
-      const finalProgress = Math.max(averageProgress, completionProgress);
-      setCourseProgress(finalProgress);
-      
-      console.log('✅ Course progress calculated:', finalProgress, '%');
-      console.log('✅ Total videos:', totalVideos, 'Completed videos:', completedVideos);
-      
-      // Update course data with new progress only if it's different
-      setCourseData((prev: any) => {
-        const newProgress = `${Math.round(finalProgress)}%`;
-        if (prev.course_completed !== newProgress) {
-          return {
-            ...prev,
-            course_completed: newProgress
-          };
-        }
-        return prev; // No change needed
-      });
-      
-      // Save course progress locally
-      try {
-        const courseProgressKey = `course_progress_${courseId}`;
-        const courseProgressData = {
-          course_id: courseId,
-          progress: finalProgress,
-          timestamp: Date.now()
-        };
-        
-        await EncryptedStorage.setItem(courseProgressKey, JSON.stringify(courseProgressData));
-        console.log('💾 Course progress saved locally:', courseProgressData);
-      } catch (error) {
-        console.log('❌ Error saving course progress locally:', error);
-      }
-      
-    } catch (error) {
-      console.error('❌ Error calculating course progress:', error);
-    }
-  }, [courseId, courseData?.course_videos]);
-
-  const handleEnroll = async (link: string) => {
-    // Prevent multiple enrollment attempts
-    // if (isEnrolling || isEnrolled) {
-    //   return;
-    // }
-    
-    // Implement enrollment functionality for all courses (free and paid)
-    if (courseSlug) {
-      try {
-        setIsEnrolling(true);
-        const response = await enrollInCourse(courseSlug, navigation);
-        
-        // Check if user is already enrolled
-        if (response?.message && response.message.includes('already enrolled')) {
-          // User is already enrolled, update the UI accordingly
-          setIsEnrolled(true);
-          setCourseData((prev: any) => ({
-            ...prev,
-            is_enrolled: true
-          }));
-          
-          // Fetch course progress
-          await fetchCourseProgress();
-          
-          // Show success message
-          Alert.alert('Success', 'You are already enrolled in this course!');
-          return;
-        }
-        
-        if (response?.status) {
-          console.log('✅ Enrollment successful! Updating UI...');
-          // Alert.alert('Success', 'You have successfully enrolled in the course!');
-          setIsEnrolled(true);
-          
-          // Save enrollment status locally
-          await saveEnrollmentStatus(courseId, true);
-          console.log('✅ Enrollment status saved locally');
-          
-          // Update course data to reflect enrollment
-          setCourseData((prev: any) => ({
-            ...prev,
-            is_enrolled: true
-          }));
-          
-          console.log('✅ Course data updated with enrollment status');
-          
-          // Fetch course progress after enrollment
-          await fetchCourseProgress();
-          
-          console.log('✅ Course progress fetched, navigating back to Courses...');
-
-          handleEnrollLink(link);
-          
-          // Navigate back to courses list with enrollment data
-          // navigation.navigate('Courses', { 
-          //   enrolledCourseId: courseId,
-          //   enrolledCourseSlug: courseSlug 
-          // });
-        } else {
-          Alert.alert('Error', response?.message || 'Failed to enroll in the course. Please try again.');
-        }
-      } catch (error) {
-        Alert.alert('Error', 'Failed to enroll in the course. Please try again.');
-      } finally {
-        setIsEnrolling(false);
-      }
-    } else {
-      Alert.alert('Error', 'Course slug not available for enrollment.');
-    }
-  };
-
-  const handleEnrollLink = async (url: string) => {
-      try {
-        await Linking.openURL(url);
-      } catch (error: any) {
-        Alert.alert(
-          'Link Error',
-          `Could not open: ${url}\n\nError: ${error?.message || 'Unknown error'}`,
-          [{ text: 'OK' }]
-        );
-      }
+    const urls: Record<string, string> = {
+      facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareLink)}`,
+      whatsapp: `https://wa.me/?text=${encodeURIComponent(message)}`,
+      twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(message)}`,
+      telegram: `https://t.me/share/url?url=${encodeURIComponent(shareLink)}&text=${encodeURIComponent(message)}`,
     };
 
-  // Show loading state
-  if (isLoadingCourse) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.topNav}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <ArrowLeftIcon width={24} height={24} />
-          </TouchableOpacity>
-          <Text style={[styles.title, { fontFamily: getFontFamily('bold') }]}>Loading...</Text>
-          <View style={styles.shareButton} />
-        </View>
-        <View style={styles.loadingContainer}>
-          <Text style={[styles.loadingText, { fontFamily: getFontFamily('body') }]}>Loading course details...</Text>
-        </View>
-      </View>
-    );
-  }
+    const url = urls[platform];
+    if (!url) return;
 
-  // Show error state
-  if (error) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.topNav}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <ArrowLeftIcon width={24} height={24} />
-          </TouchableOpacity>
-          <Text style={[styles.title, { fontFamily: getFontFamily('bold') }]}>Error</Text>
-          <View style={styles.shareButton} />
-        </View>
-        <View style={styles.errorContainer}>
-          <Text style={[styles.errorText, { fontFamily: getFontFamily('body') }]}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={fetchCourseDetails}>
-            <Text style={[styles.retryButtonText, { fontFamily: getFontFamily('bold') }]}>Retry</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
+    try {
+      await Linking.openURL(url);
+    } catch (e) {
+      await RNShare.share({ message });
+    }
+  };
 
-  // Show course data
-  if (!courseData) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.topNav}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <ArrowLeftIcon width={24} height={24} />
-          </TouchableOpacity>
-          <Text style={[styles.title, { fontFamily: getFontFamily('bold') }]}>Course Not Found</Text>
-          <View style={styles.shareButton} />
-        </View>
-        <View style={styles.errorContainer}>
-          <Text style={[styles.errorText, { fontFamily: getFontFamily('body') }]}>Course not found</Text>
-        </View>
-      </View>
-    );
-  }
+  const videos: any[] = Array.isArray(courseData?.course_videos)
+    ? courseData.course_videos
+    : [];
+  const description = plain(courseData?.description);
+  const instructor = courseData?.instructor;
 
   return (
-    <View style={styles.container}>
-      {/* Top Navigation */}
-      <View style={styles.topNav}>
-        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-          <ArrowLeftIcon width={24} height={24} />
-        </TouchableOpacity>
-        <Text style={[styles.title, { fontFamily: getFontFamily('bold') }]}>
-          {courseData?.title || 'Loading...'}
-        </Text>
-        <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
-          <ShareIcon width={24} height={24} />
-        </TouchableOpacity>
-      </View>
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <StatusBar barStyle="dark-content" backgroundColor={theme.color.surface.app} />
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Course Thumbnail */}
-        <View style={styles.videoContainer}>
-          <Image 
-            source={{ uri: courseData?.cropped_thumbnail_url || courseData?.videoThumbnail }}
-            style={styles.videoThumbnail}
-            resizeMode="cover"
-          />
-        </View>
+      <ScreenHeader
+        title="Course"
+        onBack={() => navigation.goBack()}
+        right={
+          courseData ? (
+            <TouchableOpacity
+              style={styles.iconBtn}
+              onPress={() => setShowShare(true)}
+              hitSlop={theme.hitSlop}
+              accessibilityRole="button"
+              accessibilityLabel="Share course"
+            >
+              <Share size={18} color={theme.color.text.primary} />
+            </TouchableOpacity>
+          ) : undefined
+        }
+      />
 
-        {/* Course Title and Description */}
-        <View style={styles.courseInfoContainer}>
-          <Text style={[styles.courseTitle, { fontFamily: getFontFamily('heading') }]}>
-            {courseData?.title || 'Loading...'}
-          </Text>
-          <Text style={[styles.courseDescription, { fontFamily: getFontFamily('body') }]}>
-            {Array.isArray(courseData?.description) ? courseData.description.join(' ') : courseData?.description || 'Loading...'}
-          </Text>
-          
-          {/* Course Progress Bar */}
-          {/* {isEnrolled && courseProgress > 0 && (
-            <View style={styles.progressContainer}>
-              <Text style={styles.progressText}>
-                {Math.round(courseProgress)}% Complete
-              </Text>
-              <View style={styles.progressBarBackground}>
-                <View 
-                  style={[
-                    styles.progressBar,
-                    { width: `${courseProgress}%` }
-                  ]} 
-                />
+      {isLoading ? (
+        <LoadingState label="Loading" />
+      ) : error || !courseData ? (
+        <ErrorState
+          message={error ?? 'We could not load this course.'}
+          onRetry={fetchCourseDetails}
+        />
+      ) : (
+        <>
+          <ScrollView
+            contentContainerStyle={styles.content}
+            showsVerticalScrollIndicator={false}
+          >
+            {!!(courseData?.cropped_thumbnail_url || courseData?.videoThumbnail) && (
+              <Image
+                source={{
+                  uri:
+                    courseData.cropped_thumbnail_url || courseData.videoThumbnail,
+                }}
+                style={styles.hero}
+                resizeMode="cover"
+              />
+            )}
+
+            <Text style={styles.title}>{courseData?.title || 'Course'}</Text>
+
+            {isEnrolled && courseProgress > 0 && (
+              <View style={styles.progressCard}>
+                <Text style={styles.progressLabel}>Your progress</Text>
+                <LinearMeter progress={courseProgress} showValue height={7} />
               </View>
-            </View>
-          )} */}
-        </View>
+            )}
 
-        {/* Instructor */}
-        <View style={styles.instructorContainer}>
-          <Text style={[styles.sectionTitle, { fontFamily: getFontFamily('bold') }]}>
-            Instructor:
-          </Text>
-          <View style={styles.instructorProfile}>
-            <Image 
-              source={{ uri: courseData?.instructor?.profile_pic || 'https://randomuser.me/api/portraits/men/32.jpg' }}
-              style={styles.instructorAvatar}
-            />
-            <Text style={[styles.instructorName, { fontFamily: getFontFamily('bold') }]}>
-              {courseData?.instructor?.full_name}
-            </Text>
+            {!!description && <Text style={styles.body}>{description}</Text>}
+
+            {/* Only shown when the API actually names an instructor. The old
+                screen fell back to a stock photo of a stranger. */}
+            {!!(instructor?.full_name || instructor?.profile_pic) && (
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>Instructor</Text>
+                <View style={styles.instructor}>
+                  {instructor?.profile_pic ? (
+                    <Image
+                      source={{ uri: instructor.profile_pic }}
+                      style={styles.instructorAvatar}
+                    />
+                  ) : (
+                    <View
+                      style={[styles.instructorAvatar, styles.instructorFallback]}
+                    >
+                      <User size={20} color={theme.color.text.inverse} />
+                    </View>
+                  )}
+                  <Text style={styles.instructorName} numberOfLines={1}>
+                    {instructor?.full_name || 'Master Phil Ross'}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>
+                Curriculum{videos.length > 0 ? ` · ${videos.length} videos` : ''}
+              </Text>
+
+              {videos.length === 0 ? (
+                <View style={styles.emptyCurriculum}>
+                  <Text style={styles.emptyText}>
+                    The curriculum for this course is not published yet.
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.curriculum}>
+                  {videos.map((video: any, i: number) => {
+                    const pct = videoProgress[String(video.id)] ?? 0;
+                    const done = pct >= COMPLETE_AT;
+                    return (
+                      <TouchableOpacity
+                        key={video.id ?? i}
+                        style={styles.lesson}
+                        onPress={() => handlePlayVideo(video)}
+                        activeOpacity={0.75}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Play ${video.title}`}
+                      >
+                        <View style={[styles.seq, done && styles.seqDone]}>
+                          {done ? (
+                            <Check size={13} color={theme.color.text.inverse} />
+                          ) : (
+                            <Text style={styles.seqText} allowFontScaling={false}>
+                              {video.sequence ?? i + 1}
+                            </Text>
+                          )}
+                        </View>
+
+                        <View style={styles.lessonText}>
+                          <Text style={styles.lessonTitle} numberOfLines={2}>
+                            {video.title || `Video ${i + 1}`}
+                          </Text>
+                          {pct > 0 && !done && (
+                            <LinearMeter
+                              progress={pct}
+                              height={4}
+                              style={styles.lessonMeter}
+                            />
+                          )}
+                          {done && <Text style={styles.lessonDone}>Completed</Text>}
+                        </View>
+
+                        <View style={styles.playBtn}>
+                          <Play size={14} color={theme.color.text.onBrand} />
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
+          </ScrollView>
+
+          <View
+            style={[
+              styles.bar,
+              { paddingBottom: Math.max(insets.bottom, theme.space.lg) },
+            ]}
+          >
+            <TouchableOpacity
+              style={styles.cta}
+              onPress={() => openLink(courseData?.destination_link)}
+              activeOpacity={0.9}
+              accessibilityRole="button"
+            >
+              <Text style={styles.ctaText}>
+                {isEnrolled ? 'Go to course' : 'Enrol now'}
+              </Text>
+            </TouchableOpacity>
           </View>
-        </View>
+        </>
+      )}
 
+      {/* Player — full screen, black, and free to rotate. */}
+      <Modal
+        visible={!!selectedVideo}
+        animationType="fade"
+        onRequestClose={() => setSelectedVideo(null)}
+        supportedOrientations={['portrait', 'landscape']}
+      >
+        <View style={styles.player}>
+          <SafeAreaView edges={['top']} style={styles.playerHead}>
+            <Text style={styles.playerTitle} numberOfLines={1}>
+              {selectedVideo?.title ?? ''}
+            </Text>
+            <TouchableOpacity
+              onPress={() => setSelectedVideo(null)}
+              hitSlop={theme.hitSlop}
+              accessibilityRole="button"
+              accessibilityLabel="Close player"
+            >
+              <Close size={19} color={theme.color.text.inverse} />
+            </TouchableOpacity>
+          </SafeAreaView>
 
-
-        {/* Course Curriculum */}
-        <View style={styles.curriculumContainer}>
-          <Text style={[styles.sectionTitle, { fontFamily: getFontFamily('bold') }]}>
-            Course Curriculum
-          </Text>
-          
-
-          
-          {courseData?.course_videos && courseData.course_videos.length > 0 ? (
-            courseData.course_videos.map((video: any) => (
-              <View key={video.id} style={styles.moduleCard}>
-                <View style={styles.moduleNumberContainer}>
-                  <Text style={[styles.moduleNumber, { fontFamily: getFontFamily('bold') }]}>
-                    {video.sequence}
-                  </Text>
-                </View>
-                <View style={styles.moduleInfo}>
-                  <Text style={[styles.moduleTitle, { fontFamily: getFontFamily('bold') }]}>
-                    {video.title}
-                  </Text>
-                  <Text style={[styles.moduleDuration, { fontFamily: getFontFamily('body') }]}>
-                    Video {video.sequence}
-                  </Text>
-                </View>
-                <TouchableOpacity 
-                  style={styles.playModuleButton}
-                  onPress={() => handlePlayVideo(video.id)}
-                >
-                  <RedPlayIcon width={24} height={24} />
-                </TouchableOpacity>
-              </View>
-            ))
-          ) : (
-            <View style={styles.noModulesContainer}>
-              <Text style={[styles.noModulesText, { fontFamily: getFontFamily('body') }]}>
-                Course curriculum will be available soon
-              </Text>
-            </View>
+          {!!selectedVideo && (
+            <VideoPlayerNew
+              videUrl={videoUrlOf(selectedVideo)}
+              thumbnailUrl={selectedVideo?.cropped_thumbnail_url}
+              title={`${courseData?.title ?? ''} — ${selectedVideo?.title ?? ''}`}
+              onProgress={data => {
+                const total = data.seekableDuration;
+                if (!total) return;
+                const pct = (data.currentTime / total) * 100;
+                const done = pct >= COMPLETE_AT;
+                // Write on each 5% step, or once complete — not every frame.
+                if (Math.floor(pct) % 5 === 0 || done) {
+                  recordProgress(selectedVideo, pct, done);
+                }
+              }}
+              onEnd={async () => {
+                await recordProgress(selectedVideo, 100, true);
+                await loadProgress(courseData);
+              }}
+            />
           )}
         </View>
+      </Modal>
 
-        {/* Enroll Button */}
-        <TouchableOpacity
-          style={[styles.enrollButton, isEnrolled && styles.enrolledButton]}
-          onPress={() => { handleEnrollLink(courseData?.destination_link) }}>
-          <Text style={[styles.enrollButtonText, { fontFamily: getFontFamily('bold') }]}>ENROLL NOW</Text>
-        </TouchableOpacity>
-      </ScrollView>
+      <Modal
+        visible={showShare}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowShare(false)}
+      >
+        <Pressable style={styles.overlay} onPress={() => setShowShare(false)}>
+          <Pressable
+            style={[
+              styles.sheet,
+              { paddingBottom: Math.max(insets.bottom, theme.space.xl) },
+            ]}
+            onPress={e => e.stopPropagation()}
+          >
+            <View style={styles.grabber} />
 
-      {/* Share Modal */}
-      {showShare && (
-        <View style={styles.shareOverlay}>
-          <View style={[styles.shareModal, { paddingBottom: insets.bottom }]}>
-            <View style={styles.shareHeader}>
-              <TouchableOpacity onPress={() => setShowShare(false)}>
-                <Text style={styles.closeButton}>✕</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.shareContent}>
-              <View style={styles.shareIconContainer}>
-                <View style={styles.shareIcon}>
-                  <Image source={share} style={{ height: 40, width: 40 }} />
-                </View>
-              </View>
-              <Text style={[styles.shareTitle, { fontFamily: getFontFamily('bold') }]}>Share</Text>
-              <View style={styles.shareLinkSection}>
-                <View style={styles.contentContainer}>
-                  <Text style={[styles.contentText, { fontFamily: getFontFamily('bold') }]}>
-                    PhilRoss App – Train Smarter. Get Stronger.{'\n'}
-                    Unlock expert training, fitness routines & the BodyBell Method® – anytime, anywhere!
-                  </Text>
-                </View>
-                
-                <Text style={[styles.downloadTitle, { fontFamily: getFontFamily('bold') }]}>Download now:</Text>
-                
-                <View style={styles.downloadSection}>
-                  <View style={styles.linkContainer}>
-                    <Text style={[styles.linkText, { fontFamily: getFontFamily('body') }]}>
-                      https://play.google.com/store/apps/details?id=com.philross
-                    </Text>
-                    <TouchableOpacity 
-                      style={styles.copyButton}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                      onPress={() => {
-                        const androidLink = 'https://play.google.com/store/apps/details?id=com.philross';
-                        try {
-                          Clipboard.setString(androidLink);
-                          if (Platform.OS === 'android') {
-                            ToastAndroid.show('Android link copied', ToastAndroid.SHORT);
-                          } else {
-                            Alert.alert('Link Copied', 'Android link copied to clipboard');
-                          }
-                        } catch (e) {
-                          console.log('Copy failed:', e);
-                          Alert.alert('Copy Failed', 'Unable to copy link, please try again.');
-                        }
-                      }}
-                    >
-                      <DocumentCopyIcon width={20} height={20} />
-                    </TouchableOpacity>
-                  </View>
-                  
-                  <View style={styles.linkContainer}>
-                    <Text style={[styles.linkText, { fontFamily: getFontFamily('body') }]}>
-                      https://apps.apple.com/us/app/philross/id6751194230
-                    </Text>
-                    <TouchableOpacity 
-                      style={styles.copyButton}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                      onPress={() => {
-                        const iosLink = 'https://apps.apple.com/us/app/philross/id6751194230';
-                        try {
-                          Clipboard.setString(iosLink);
-                          if (Platform.OS === 'android') {
-                            ToastAndroid.show('iOS link copied', ToastAndroid.SHORT);
-                          } else {
-                            Alert.alert('Link Copied', 'iOS link copied to clipboard');
-                          }
-                        } catch (e) {
-                          console.log('Copy failed:', e);
-                          Alert.alert('Copy Failed', 'Unable to copy link, please try again.');
-                        }
-                      }}
-                    >
-                      <DocumentCopyIcon width={20} height={20} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-              <View style={styles.shareToSection}>
-                <Text style={[styles.shareSectionTitle, { fontFamily: getFontFamily('bold') }]}>Share to</Text>
-                <View style={styles.socialButtons}>
-                  <TouchableOpacity style={styles.socialButton} onPress={() => handleSocialShare('facebook')}>
-                    <Image source={FbIcon} style={styles.socialIcons} resizeMode='contain' />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.socialButton} onPress={() => handleSocialShare('whatsapp')}>
-                    <Image source={WhatsAppIcon} style={styles.socialIcons} resizeMode='contain' />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.socialButton} onPress={() => handleSocialShare('instagram')}>
-                    <Image source={InstagramIcon} style={styles.socialIcons} resizeMode='contain' />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.socialButton} onPress={() => handleSocialShare('twitter')}>
-                   <Image source={XIcon} style={styles.socialIcons} resizeMode='contain' />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.socialButton} onPress={() => handleSocialShare('telegram')}>
-                    <Image source={TelegramIcon} style={styles.socialIcons} resizeMode='contain' />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          </View>
-        </View>
-      )}
-
-      {/* Video Player Modal */}
-      {showVideoModal && selectedVideo && (
-        <View style={styles.videoModalOverlay}>
-          <View style={styles.videoModal}>
-            <View style={styles.videoModalHeader}>
-              <Text style={[styles.videoModalTitle, { fontFamily: getFontFamily('bold') }]}>
-                {selectedVideo.title}
-              </Text>
-              <TouchableOpacity 
-                style={styles.videoModalCloseButton}
-                onPress={() => {
-                  setShowVideoModal(false);
-                  setSelectedVideo(null);
-                }}
+            <View style={styles.sheetHead}>
+              <Text style={styles.sheetTitle}>Share course</Text>
+              <TouchableOpacity
+                onPress={() => setShowShare(false)}
+                hitSlop={theme.hitSlop}
+                accessibilityRole="button"
+                accessibilityLabel="Close"
               >
-                <Text style={styles.videoModalCloseText}>X</Text>
+                <Close size={17} color={theme.color.text.muted} />
               </TouchableOpacity>
             </View>
-            
-            <View style={styles.videoPlayerContainer}>
-              {/* {isVideoLoading && (
-                <View style={styles.videoLoadingContainer}>
-                  <ActivityIndicator size="large" color="#B62020" />
-                  <Text style={styles.videoLoadingText}>Loading video...</Text>
-                </View>
-              )} */}
-              {/* <VideoPlayer
-                ref={videoPlayerRef}
-                source={{
-                  uri: selectedVideo.video || selectedVideo.video_url || selectedVideo.url || selectedVideo.video_link
+
+            <View style={styles.linkRow}>
+              <Text style={styles.linkText} numberOfLines={1}>
+                {shareLink}
+              </Text>
+              <TouchableOpacity
+                style={styles.copyBtn}
+                onPress={() => {
+                  Clipboard.setString(shareLink);
+                  toast('Link copied');
                 }}
-                showDuration={true}
-                onLoadStart={() => {
-                  console.log('🔄 Video loading started');
-                  setIsVideoLoading(true);
-                }}
-                onLoad={(data) => {
-                  console.log('✅ Video loaded successfully:', data);
-                  setIsVideoLoading(false);
-                }}
-                onProgress={async (data) => {
-                  console.log('📊 Video progress:', data);
-                  
-                  // Update video progress every 5 seconds or when significant progress is made
-                  if (data.currentTime && data.seekableDuration) {
-                    const progress = (data.currentTime / data.seekableDuration) * 100;
-                    const isCompleted = progress >= 90; // Consider video completed at 90%
-                    
-                    // Update progress every 5% or every 30 seconds
-                    const shouldUpdate = Math.floor(progress) % 5 === 0 || 
-                                       Math.floor(data.currentTime) % 30 === 0 ||
-                                       isCompleted;
-                    
-                    if (shouldUpdate) {
-                      try {
-                        console.log(`📊 Updating video progress: ${Math.round(progress)}% (${Math.round(data.currentTime)}s/${Math.round(data.seekableDuration)}s)`);
-                        
-                        // Save video progress locally
-                        const videoProgressKey = `video_progress_${courseId}_${selectedVideo.id}`;
-                        const videoProgressData = {
-                          video_id: selectedVideo.id,
-                          course_id: courseId,
-                          watch_percentage: Math.round(progress),
-                          is_completed: isCompleted,
-                          timestamp: Date.now()
-                        };
-                        
-                        await EncryptedStorage.setItem(videoProgressKey, JSON.stringify(videoProgressData));
-                        console.log('💾 Video progress saved locally:', videoProgressData);
-                        
-                        // Also send to backend
-                        await updateVideoProgress({
-                          video_id: selectedVideo.id,
-                          course_id: courseId,
-                          watch_percentage: Math.round(progress),
-                          is_completed: isCompleted
-                        }, navigation);
-                        
-                        // Refresh course progress after significant updates
-                        if (isCompleted || Math.floor(progress) % 25 === 0) {
-                          await fetchCourseProgress();
-                        }
-                      } catch (error) {
-                        console.log('❌ Error updating video progress:', error);
-                      }
-                    }
-                  }
-                }}
-                onError={(e) => {
-                  console.log('❌ Video player error:', e);
-                  console.log('❌ Video URL being used:', selectedVideo.video || selectedVideo.video_url || selectedVideo.url || selectedVideo.video_link);
-                  setIsVideoLoading(false);
-                  Alert.alert(
-                    'Video Error', 
-                    'Failed to load video. Please check your internet connection and try again.',
-                    [
-                      { text: 'Cancel', style: 'cancel' },
-                      { 
-                        text: 'Retry', 
-                        onPress: () => {
-                          console.log('🔄 Retrying video playback...');
-                          setIsVideoLoading(true);
-                          // Force video player to reload
-                          if (videoPlayerRef.current) {
-                            videoPlayerRef.current.seek(0);
-                          }
-                        }
-                      }
-                    ]
-                  );
-                }}
-                onEnd={async () => {
-                  console.log('✅ Video ended - marking as completed');
-                  try {
-                    // Save video as 100% completed locally
-                    const videoProgressKey = `video_progress_${courseId}_${selectedVideo.id}`;
-                    const videoProgressData = {
-                      video_id: selectedVideo.id,
-                      course_id: courseId,
-                      watch_percentage: 100,
-                      is_completed: true,
-                      timestamp: Date.now()
-                    };
-                    
-                    await EncryptedStorage.setItem(videoProgressKey, JSON.stringify(videoProgressData));
-                    console.log('💾 Video completed and saved locally:', videoProgressData);
-                    
-                    // Also send to backend
-                    await updateVideoProgress({
-                      video_id: selectedVideo.id,
-                      course_id: courseId,
-                      watch_percentage: 100,
-                      is_completed: true
-                    }, navigation);
-                    
-                    // Refresh course progress
-                    await fetchCourseProgress();
-                    
-                    console.log('✅ Video marked as completed');
-                  } catch (error) {
-                    console.log('❌ Error marking video as completed:', error);
-                  }
-                }}
-                style={styles.videoPlayer}
-                controls={true}
-                fullscreen={true}
-                fullscreenOrientation="landscape"
-              /> */}
-              
-              <VideoPlayerNew
-                videUrl={selectedVideo?.video.toString() || ""}
-                title={courseData?.title + ':- ' + selectedVideo.title}
-                onProgress={async (data) => {
-                  console.log('📊 Video progress:', data);
-
-                  // Update video progress every 5 seconds or when significant progress is made
-                  if (data.currentTime && data.seekableDuration) {
-                    const progress = (data.currentTime / data.seekableDuration) * 100;
-                    const isCompleted = progress >= 90; // Consider video completed at 90%
-
-                    // Update progress every 5% or every 30 seconds
-                    const shouldUpdate = Math.floor(progress) % 5 === 0 ||
-                      Math.floor(data.currentTime) % 30 === 0 ||
-                      isCompleted;
-
-                    if (shouldUpdate) {
-                      try {
-                        console.log(`📊 Updating video progress: ${Math.round(progress)}% (${Math.round(data.currentTime)}s/${Math.round(data.seekableDuration)}s)`);
-
-                        // Save video progress locally
-                        const videoProgressKey = `video_progress_${courseId}_${selectedVideo.id}`;
-                        const videoProgressData = {
-                          video_id: selectedVideo.id,
-                          course_id: courseId,
-                          watch_percentage: Math.round(progress),
-                          is_completed: isCompleted,
-                          timestamp: Date.now()
-                        };
-
-                        await EncryptedStorage.setItem(videoProgressKey, JSON.stringify(videoProgressData));
-                        console.log('💾 Video progress saved locally:', videoProgressData);
-
-                        // Also send to backend
-                        await updateVideoProgress({
-                          video_id: selectedVideo.id,
-                          course_id: courseId,
-                          watch_percentage: Math.round(progress),
-                          is_completed: isCompleted
-                        }, navigation);
-
-                        // Refresh course progress after significant updates
-                        if (isCompleted || Math.floor(progress) % 25 === 0) {
-                          await fetchCourseProgress();
-                        }
-                      } catch (error) {
-                        console.log('❌ Error updating video progress:', error);
-                      }
-                    }
-                  }
-                }}
-                onEnd={async () => {
-                  console.log('✅ Video ended - marking as completed');
-                  try {
-                    // Save video as 100% completed locally
-                    const videoProgressKey = `video_progress_${courseId}_${selectedVideo.id}`;
-                    const videoProgressData = {
-                      video_id: selectedVideo.id,
-                      course_id: courseId,
-                      watch_percentage: 100,
-                      is_completed: true,
-                      timestamp: Date.now()
-                    };
-
-                    await EncryptedStorage.setItem(videoProgressKey, JSON.stringify(videoProgressData));
-                    console.log('💾 Video completed and saved locally:', videoProgressData);
-
-                    // Also send to backend
-                    await updateVideoProgress({
-                      video_id: selectedVideo.id,
-                      course_id: courseId,
-                      watch_percentage: 100,
-                      is_completed: true
-                    }, navigation);
-
-                    // Refresh course progress
-                    await fetchCourseProgress();
-
-                    console.log('✅ Video marked as completed');
-                  } catch (error) {
-                    console.log('❌ Error marking video as completed:', error);
-                  }
-                }}
-              />
+                accessibilityRole="button"
+                accessibilityLabel="Copy link"
+              >
+                <Copy size={16} color={theme.color.text.secondary} />
+              </TouchableOpacity>
             </View>
-          </View>
-        </View>
-      )}
-    </View>
+
+            <View style={styles.socialRow}>
+              {SOCIALS.map(s => (
+                <TouchableOpacity
+                  key={s.key}
+                  style={styles.social}
+                  onPress={() => handleSocialShare(s.key)}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Share on ${s.label}`}
+                >
+                  <View style={styles.socialDisc}>
+                    <Image
+                      source={s.png}
+                      style={styles.socialImg}
+                      resizeMode="contain"
+                    />
+                  </View>
+                  <Text style={styles.socialLabel} numberOfLines={1}>
+                    {s.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  topNav: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  safe: { flex: 1, backgroundColor: theme.color.surface.app },
+  iconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: theme.radius.md,
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 70 : 50,
-    paddingBottom: 20,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
     justifyContent: 'center',
-    alignItems: 'flex-start',
-  },
-  shareButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'flex-end',
-  },
-  title: {
-    fontSize: 18,
-    fontFamily: getFontFamily('bold'),
-    color: '#000000',
-    flex: 1,
-    textAlign: 'center',
+    backgroundColor: theme.color.surface.card,
+    borderWidth: 1,
+    borderColor: theme.color.border.subtle,
   },
   content: {
-    flex: 1,
-    paddingBottom: 20,
-  },
-  videoContainer: {
-    width: '100%',
-    height: 220,
-    position: 'relative',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-  videoThumbnail: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 20,
+    paddingHorizontal: theme.space.screen,
+    paddingBottom: theme.space['4xl'],
   },
 
-  courseInfoContainer: {
-    padding: 20,
+  hero: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: 16,
+    backgroundColor: theme.color.neutral[200],
   },
-  courseTitle: {
-    fontSize: 24,
-    fontFamily: getFontFamily('bold'),
-    color: '#000000',
-    marginBottom: 10,
+  title: {
+    fontFamily: theme.font.bold,
+    fontSize: theme.type.h1.fontSize,
+    lineHeight: theme.type.h1.lineHeight,
+    letterSpacing: theme.type.h1.letterSpacing,
+    color: theme.color.text.primary,
+    marginTop: theme.space.lg,
   },
-  courseDescription: {
-    fontSize: 16,
-    color: '#666666',
-    lineHeight: 24,
+
+  progressCard: {
+    backgroundColor: theme.color.surface.card,
+    borderRadius: 14,
+    padding: theme.space.lg,
+    marginTop: theme.space.lg,
+    gap: theme.space.sm,
   },
-  instructorContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+  progressLabel: {
+    fontFamily: theme.font.semibold,
+    fontSize: theme.type.overline.fontSize,
+    letterSpacing: theme.type.overline.letterSpacing,
+    textTransform: 'uppercase',
+    color: theme.color.text.muted,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontFamily: getFontFamily('bold'),
-    color: '#000000',
-    marginBottom: 15,
+
+  body: {
+    fontFamily: theme.font.regular,
+    fontSize: theme.type.body.fontSize,
+    lineHeight: 23,
+    color: theme.color.text.secondary,
+    marginTop: theme.space.lg,
   },
-  instructorProfile: {
+
+  section: { marginTop: theme.space['2xl'] },
+  sectionLabel: {
+    fontFamily: theme.font.semibold,
+    fontSize: theme.type.overline.fontSize,
+    letterSpacing: theme.type.overline.letterSpacing,
+    textTransform: 'uppercase',
+    color: theme.color.text.muted,
+    marginBottom: theme.space.md,
+  },
+
+  instructor: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: theme.space.lg,
+    backgroundColor: theme.color.surface.card,
+    borderRadius: 16,
+    padding: theme.space.lg,
   },
   instructorAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 10,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: theme.color.neutral[200],
+  },
+  instructorFallback: {
+    backgroundColor: theme.color.brand.base,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   instructorName: {
-    fontSize: 16,
-    color: '#000000',
-  },
-  curriculumContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  moduleCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F9F9F9',
-    borderRadius: 10,
-    marginBottom: 15,
-    padding: 15,
-  },
-  moduleNumberContainer: {
-    width: 30,
-    alignItems: 'center',
-  },
-  moduleNumber: {
-    fontSize: 16,
-    color: '#B62020',
-  },
-  moduleInfo: {
     flex: 1,
-    marginLeft: 10,
-  },
-  moduleTitle: {
-    fontSize: 16,
-    color: '#000000',
-    marginBottom: 5,
-  },
-  moduleDuration: {
-    fontSize: 14,
-    color: '#666666',
-  },
-  playModuleButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  lockedModuleButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  // Completed video styles
-  completedModuleCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F0F8F0', // Light green background
-    borderRadius: 10,
-    marginBottom: 15,
-    padding: 15,
-    borderWidth: 2,
-    borderColor: '#4CAF50', // Green border
-  },
-  completedModuleNumberContainer: {
-    width: 30,
-    alignItems: 'center',
-    backgroundColor: '#4CAF50', // Green background
-    borderRadius: 15,
-    paddingVertical: 5,
-  },
-  completedModuleNumber: {
-    fontSize: 16,
-    color: '#FFFFFF', // White text
-    fontFamily: getFontFamily('bold'),
-  },
-  completedModuleTitle: {
-    fontSize: 16,
-    color: '#2E7D32', // Dark green text
-    marginBottom: 5,
-    fontFamily: getFontFamily('bold'),
-  },
-  completedModuleDuration: {
-    fontSize: 14,
-    color: '#4CAF50', // Green text
-    fontFamily: getFontFamily('body'),
-  },
-  completedModuleButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#4CAF50', // Green background
-    borderRadius: 20,
-  },
-  enrollButton: {
-    backgroundColor: '#B62020',
-    borderRadius: 30,
-    paddingVertical: 10,
-    marginHorizontal: 20,
-    marginBottom: 30,
-    alignItems: 'center',
-  },
-  enrolledButton: {
-    backgroundColor: '#28A745', // Green background for enrolled state
-  },
-  enrollButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontFamily: getFontFamily('bold'),
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#666666',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  errorText: {
-    fontSize: 16,
-    color: '#B62020',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  retryButton: {
-    backgroundColor: '#B62020',
-    borderRadius: 30,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-  },
-  retryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-  },
-  socialButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-    margin: 5,
-  },
-  noModulesContainer: {
-    padding: 20,
-    alignItems: 'center',
-  },
-  noModulesText: {
-    fontSize: 16,
-    color: '#666666',
-    textAlign: 'center',
-  },
-  progressSection: {
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    marginBottom: 10,
+    fontFamily: theme.font.semibold,
+    fontSize: theme.type.body.fontSize,
+    color: theme.color.text.primary,
   },
 
-  shareOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    zIndex: 1000,
-  },
-  shareModal: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-    padding: 0, // Remove all padding
-    width: '100%',
-    // height: '100%', // Full screen height
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    // top: 250, // Moved up to provide more space at bottom
-  },
-  shareHeader: {
+  curriculum: { gap: theme.space.sm },
+  lesson: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    paddingTop: 10,
-    paddingRight: 20, // Add right padding for close button
-  },
-  closeButton: {
-    fontSize: 24,
-    color: '#000000',
-    fontFamily: getFontFamily('bold'),
-    padding: 5,
-  },
-  shareContent: {
     alignItems: 'center',
-    paddingTop: 15,
-    paddingHorizontal: 20, // Add horizontal padding to content
+    gap: theme.space.lg,
+    backgroundColor: theme.color.surface.card,
+    borderRadius: 14,
+    paddingHorizontal: theme.space.lg,
+    paddingVertical: theme.space.md,
   },
-  shareIconContainer: {
-    marginBottom: 2,
-  },
-  shareIcon: {
-    width: 80,
-    height: 80,
+  /** Number becomes a green tick once watched — shape changes, not just hue. */
+  seq: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: theme.color.surface.sunken,
+  },
+  seqDone: { backgroundColor: theme.color.status.success },
+  seqText: {
+    fontFamily: theme.font.bold,
+    fontSize: theme.type.caption.fontSize,
+    color: theme.color.text.secondary,
+    includeFontPadding: false,
+  },
+  lessonText: { flex: 1, minWidth: 0, gap: 4 },
+  lessonTitle: {
+    fontFamily: theme.font.semibold,
+    fontSize: theme.type.bodySm.fontSize,
+    lineHeight: 19,
+    color: theme.color.text.primary,
+  },
+  lessonMeter: { marginTop: 2 },
+  lessonDone: {
+    fontFamily: theme.font.medium,
+    fontSize: theme.type.caption.fontSize,
+    color: theme.color.status.success,
+  },
+  playBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
-    backgroundColor: '#B62020',
-    borderRadius: 40,
+    justifyContent: 'center',
+    backgroundColor: theme.color.brand.base,
   },
-  shareTitle: {
-    fontSize: 24,
-    fontFamily: getFontFamily('bold'),
-    color: '#000000',
-    marginBottom: 30,
+
+  emptyCurriculum: {
+    backgroundColor: theme.color.surface.card,
+    borderRadius: 14,
+    padding: theme.space.xl,
   },
-  shareLinkSection: {
-    width: '100%',
-    marginBottom: 30,
-  },
-  shareSectionTitle: {
-    fontSize: 16,
-    fontFamily: getFontFamily('bold'),
-    color: '#000000',
-    marginBottom: 15,
-  },
-  contentContainer: {
-    marginBottom: 20,
-  },
-  contentText: {
-    fontSize: 14,
-    color: '#000000',
+  emptyText: {
+    fontFamily: theme.font.regular,
+    fontSize: theme.type.bodySm.fontSize,
     lineHeight: 20,
-    fontFamily: getFontFamily('bold'),
+    color: theme.color.text.muted,
     textAlign: 'center',
   },
-  downloadTitle: {
-    fontSize: 16,
-    fontFamily: getFontFamily('bold'),
-    color: '#000000',
-    marginBottom: 20,
-    marginTop: -2,
+
+  bar: {
+    paddingHorizontal: theme.space.screen,
+    paddingTop: theme.space.md,
+    backgroundColor: theme.color.surface.card,
+    borderTopWidth: 1,
+    borderTopColor: theme.color.border.subtle,
   },
-  downloadSection: {
-    gap: 12,
-    marginBottom: 40,
-    marginTop: -10,
+  cta: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 52,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.color.brand.base,
   },
-  linkContainer: {
+  ctaText: {
+    fontFamily: theme.font.semibold,
+    fontSize: theme.type.h3.fontSize,
+    color: theme.color.text.onBrand,
+  },
+
+  player: { flex: 1, backgroundColor: '#000000' },
+  playerHead: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 8,
-    paddingHorizontal: 15,
-    paddingVertical: 12,
+    gap: theme.space.lg,
+    paddingHorizontal: theme.space.lg,
+    paddingVertical: theme.space.md,
+  },
+  playerTitle: {
+    flex: 1,
+    fontFamily: theme.font.semibold,
+    fontSize: theme.type.bodySm.fontSize,
+    color: theme.color.text.inverse,
+  },
+
+  overlay: {
+    flex: 1,
+    backgroundColor: theme.color.surface.overlay,
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: theme.color.surface.card,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    paddingHorizontal: theme.space.xl,
+    paddingTop: theme.space.md,
+  },
+  grabber: {
+    alignSelf: 'center',
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: theme.color.border.default,
+    marginBottom: theme.space.lg,
+  },
+  sheetHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  sheetTitle: {
+    fontFamily: theme.font.bold,
+    fontSize: theme.type.h2.fontSize,
+    color: theme.color.text.primary,
+  },
+  linkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space.md,
+    backgroundColor: theme.color.surface.sunken,
+    borderRadius: theme.radius.md,
+    paddingLeft: theme.space.lg,
+    paddingRight: theme.space.xs,
+    paddingVertical: theme.space.xs,
+    marginTop: theme.space.lg,
   },
   linkText: {
     flex: 1,
-    fontSize: 14,
-    color: '#666666',
+    fontFamily: theme.font.regular,
+    fontSize: theme.type.caption.fontSize,
+    color: theme.color.text.secondary,
   },
-  copyButton: {
-    padding: 5,
+  copyBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: theme.radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.color.surface.card,
   },
-  shareToSection: {
-    width: '100%',
-    marginBottom: 10,
-  },
-  socialButtonsRow: {
+  socialRow: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 0,
+    justifyContent: 'space-between',
+    marginTop: theme.space.xl,
   },
-  socialButtonTransparent: {
+  social: { alignItems: 'center', gap: theme.space.xs, width: 58 },
+  socialDisc: {
     width: 50,
     height: 50,
     borderRadius: 25,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'transparent',
+    backgroundColor: theme.color.surface.sunken,
   },
-  
-  // Video Modal Styles
-  videoModalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-  },
-  videoModal: {
-    backgroundColor: '#000000',
-    borderRadius: 20,
-    width: width * 0.95,
-    maxHeight: height * 0.8,
-    overflow: 'hidden',
-  },
-  videoModalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#000000',
-  },
-  videoModalTitle: {
-    fontSize: 18,
-    fontFamily: getFontFamily('bold'),
-    color: '#FFFFFF',
-    flex: 1,
-    marginRight: 10,
-  },
-  videoModalCloseButton: {
-    padding: 5,
-  },
-  videoModalCloseText: {
-    color: '#FFFFFF',
-    fontSize: 24,
-    fontFamily: getFontFamily('bold'),
-    textAlign: 'center',
-  },
-  videoPlayerContainer: {
-    width: '100%',
-    // height: 400,
-    backgroundColor: '#000000',
-    // borderTopLeftRadius: 20,
-    overflow: 'hidden',
-    paddingBottom: 20,
-  },
-  videoPlayer: {
-    width: '100%',
-    height: '100%',
-  },
-  
-  // Video Loading Styles
-  videoLoadingContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: '#000000',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 100,
-  },
-  videoLoadingText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    marginTop: 10,
-    fontFamily: getFontFamily('body'),
-  },
-  progressContainer: {
-    marginTop: 20,
-    marginBottom: 10,
-  },
-  progressText: {
-    fontSize: 14,
-    color: '#666666',
-    marginBottom: 8,
-    fontFamily: getFontFamily('body'),
-  },
-  progressBarBackground: {
-    height: 6,
-    backgroundColor: '#F0F0F0',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressBar: {
-    height: '100%',
-    backgroundColor: '#B62020',
-    borderRadius: 3,
-  },
-  socialButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    flexWrap: 'wrap',
-  },
-  socialIcons: {
-    width: Utils.normalize(48),
-    height: Utils.normalize(48),
+  socialImg: { width: 24, height: 24 },
+  socialLabel: {
+    fontFamily: theme.font.regular,
+    fontSize: theme.type.caption.fontSize,
+    color: theme.color.text.muted,
   },
 });
 
