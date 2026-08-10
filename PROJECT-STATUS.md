@@ -26,7 +26,8 @@
 | Package manager | Yarn 1.22.10 (`yarn.lock` is authoritative) |
 | Node required | >= 18 (CI uses 20.19.0) |
 | CI/CD | Codemagic (`codemagic.yaml`) |
-| Sync status | Local and GitHub in sync at `adf4ab8` on `feat/dashboard-ui`, clean tree |
+| Sync status | `95d3c21` on `feat/dashboard-ui` — committed locally, **push pending re-auth** |
+| Backend host | AWS EC2 `18.225.28.46`, `us-east-2` (Ohio), Ubuntu + nginx 1.24 — see §11 |
 
 ---
 
@@ -125,7 +126,8 @@ master phil app/
 
 | Service | Purpose | Where configured |
 |---|---|---|
-| **Superwall** | Paywall UI + presentation logic | `App.tsx` ~line 294 (platform-split publishable `pk_` keys) and `Superwall.configure()` ~line 392 |
+| **AWS** | Hosts the backend — see §11 | EC2 in `us-east-2`, account `070634855513` |
+| **Superwall** | ⚠️ **DISABLED** — see §2 | `App.tsx` (`Superwall.configure()` commented out) |
 | **RevenueCat** | Subscriptions, entitlements, receipt validation | `RCPurchaseController.tsx` ~line 27 (`Purchases.configure`) |
 | **Firebase** | Push messaging (`@react-native-firebase/messaging`) | `android/app/google-services.json`, `ios/.../GoogleService-Info.plist` |
 | **Google Sign-In** | Social auth | `GoogleSignin.configure` in the auth flow |
@@ -308,6 +310,23 @@ react-native-share+12.1.2
 
 Every screen in `src/` now resolves through `src/theme` and the shared `ui/` kit. The old `getFontFamily` / `getColors` helpers have no remaining callers.
 
+### Phase 12 — Progress, legal, and the backend reckoning (10 Aug)
+| Commit | What |
+|---|---|
+| `d5aba94` | Project doc brought back in line with the code |
+| `4221ace` | In-app legal pages; tutorial completion; feed routing fix |
+| `0929b8e` | **Dashboard percentage made correct** |
+| `6eb9db6` | Tutorials split from courses; About heading; name edit persists |
+| `95d3c21` | Profile + tutorial progress rewritten **server-first** |
+
+**Three separate bugs were each producing a wrong percentage.** The denominator was a *page* (`limit: 12`) rather than the catalogue, so one completed tutorial out of 88 read as 8%. The denominator also *moved with your progress* — it narrowed to "courses you have started", so finishing your first of six jumped the ring from 17% to 100%. And `Math.round` showed 100% at 99.6% and 0% at 0.4%, the two values people actually check. [`src/utils/percent.ts`](src/utils/percent.ts) now reserves 0 and 100 for the exact values.
+
+**The hero ring measures tutorials only** (88 of them). Courses — 6, sold externally at $199–$499, owned by almost nobody — get their own tile. Averaging six zeroes against 88 tutorials produced a number that described nothing.
+
+**Wireless debugging replaced the USB cable** for the dev loop, after the cable was hanging the test phone. `adb pair` + `adb connect` over Wi-Fi; `adb reverse` works the same.
+
+**A live-schema audit ended the guessing about the backend.** `GET /swagger/?format=openapi` returns 30 paths, and none of them read or write a profile or tutorial progress. That is why the name change never saved. See §12.
+
 ---
 
 ## 8. Current State & Known Issues
@@ -326,19 +345,21 @@ Every screen in `src/` now resolves through `src/theme` and the shared `ui/` kit
 1. **The paywall over-promises.** Its copy says "Every structured training programme", but the subscription unlocks **feed tutorials only** — courses are sold separately through external Stripe links at $199–$499. Either the copy narrows or courses come inside the subscription. This is a commercial decision, not a code one.
 2. **Applications do not say which programme they are for.** `IntakeFormScreen` receives `coachId` on the route but the payload's `coach` field was commented out before this work. Adding it back is a backend question — confirm the API accepts it first.
 
-*Backend gaps*
-3. **No progress endpoint.** Course and video progress is written to `EncryptedStorage` on the device and posted to `updateVideoProgress`, but there is no GET, so the dashboard rings read 0 until a real endpoint exists. Progress also does not survive a reinstall or move to a second device.
-4. **The backend knows nothing about subscriptions.** Entitlement lives entirely in RevenueCat. If the server ever needs to gate content, it needs a RevenueCat webhook.
+*Backend gaps — see [BACKEND-REQUIREMENTS.md](BACKEND-REQUIREMENTS.md) for the fix*
+3. 🔴 **The API has no profile endpoint.** Not "it's broken" — the route was never created. Confirmed against the live OpenAPI schema: 30 paths, none of which read or write a user. So changing your name cannot reach the server, and the app falls back to saving on the device. **~15 minutes of Django work** and it is fixed; the app already sends the right request.
+4. 🔴 **No tutorial-progress endpoint either.** Completions live only on the phone, so a reinstall wipes them. The app is already written server-first — `loadAll()` asks the server and only falls back to its cache — so the two endpoints in the requirements doc are all that is needed.
+5. 🟡 **`POST /course/{id}/video_watched/` exists but ignored its body.** Every field was commented out in the app, so the server received a bare ping and could never know a watch percentage — which is why `course_completed` returns `"0 %"` regardless. The app now sends real data; the view still needs to read it, and there is still no GET to read progress back.
+6. ✅ **Subscriptions are not a gap after all.** `/payments/webhooks/revenuecat/` **does exist** in the schema — an earlier version of this document was wrong to say the backend knows nothing about them.
 
 *Housekeeping*
-5. **Splash logo is blank.** Commit `41b64b5` removed the logo as a stopgap for the Android 12+ crop/zoom bug. Note that every current logo asset bakes in a black background with **no alpha channel**, which is why the side-menu masthead sits on pure black — a transparent PNG would fix both.
-6. **Two pre-existing type errors in payment code.** `RCPurchaseController` passes `automaticDeviceIdentifierCollectionEnabled`, which the RevenueCat SDK does not declare, and `subscriptionService` reads `subscriberAttributes` off `CustomerInfo`, where it does not exist. Both are no-ops at runtime; neither was touched by the UI work.
-7. **Android Play Store upload is manual.** The `google_play:` block in `codemagic.yaml` is commented out; needs a Play Console service-account JSON wired in as a Codemagic integration.
-8. **Keystore passwords are in `android/app/build.gradle`** in plain text. They belong in `gradle.properties` outside the repo, or in Codemagic environment variables.
-9. **`yarn.lock` is not committed**, so builds are not reproducible.
-10. **`safe-area-context` patch version mismatch.** The patch targets 5.5.2 while `package.json` requests `^5.6.0` — a clean `yarn install` may fail to apply it.
-11. **`README.md` is still the default React Native boilerplate.**
-12. **Dev API config has a hardcoded LAN IP** (`10.190.211.97` in `app/config/apiConfig.js`) that must be updated whenever the dev machine's Wi-Fi address changes. Production is unaffected.
+7. **Splash logo is blank.** Commit `41b64b5` removed the logo as a stopgap for the Android 12+ crop/zoom bug. Note that every current logo asset bakes in a black background with **no alpha channel**, which is why the side-menu masthead sits on pure black — a transparent PNG would fix both.
+8. **Two pre-existing type errors in payment code.** `RCPurchaseController` passes `automaticDeviceIdentifierCollectionEnabled`, which the RevenueCat SDK does not declare, and `subscriptionService` reads `subscriberAttributes` off `CustomerInfo`, where it does not exist. Both are no-ops at runtime; neither was touched by the UI work.
+9. **Android Play Store upload is manual.** The `google_play:` block in `codemagic.yaml` is commented out; needs a Play Console service-account JSON wired in as a Codemagic integration.
+10. **Keystore passwords are in `android/app/build.gradle`** in plain text. They belong in `gradle.properties` outside the repo, or in Codemagic environment variables.
+11. **`yarn.lock` is not committed**, so builds are not reproducible.
+12. **`safe-area-context` patch version mismatch.** The patch targets 5.5.2 while `package.json` requests `^5.6.0` — a clean `yarn install` may fail to apply it.
+13. **`README.md` is still the default React Native boilerplate.**
+14. **Dev API config has a hardcoded LAN IP** (`10.190.211.97` in `app/config/apiConfig.js`) that must be updated whenever the dev machine's Wi-Fi address changes. Production is unaffected.
 
 > ⚠️ **Rotate credentials exposed to build machines.** See Phase 7 — the obfuscated payload ran on Codemagic from the first commit until 6 Aug.
 
@@ -387,7 +408,8 @@ There is no staging branch. Any push to `master` starts an iOS build that auto-p
 | Paywall copy, pricing, entitlement behaviour | `src/screens/PaywallScreen.tsx`, `src/services/subscriptionService.ts`, RevenueCat dashboard |
 | Purchase or restore logic | `RCPurchaseController.tsx` |
 | Logo, icons, splash art | `assets/icons/`, `assets/bootsplash/`, plus native folders |
-| Privacy policy / terms wording | `docs/privacy-policy.html`, `docs/terms-of-use.html` |
+| Privacy policy / terms wording | [`src/screens/LegalScreen.tsx`](src/screens/LegalScreen.tsx) for the in-app pages, plus `docs/*.html` for the public ones |
+| Anything the server must store | It probably does not exist yet — check [BACKEND-REQUIREMENTS.md](BACKEND-REQUIREMENTS.md) first |
 | Build, signing or release changes | `codemagic.yaml` |
 
 ---
@@ -405,3 +427,68 @@ There is no staging branch. Any push to `master` starts an iOS build that auto-p
 | RevenueCat dashboard | — | Products and entitlements defined here |
 
 > **Note on this Windows machine:** git stores one credential per host, so the `byterisellc` token is used for *every* GitHub push here. If you later push to a repo that account cannot write to, set `git config --global credential.useHttpPath true` to allow per-repo credentials.
+
+---
+
+## 11. The Backend — Where It Lives and How To Reach It
+
+Discovered by inspection on 10 Aug 2026, because nobody had written it down.
+
+| Fact | Value | How we know |
+|---|---|---|
+| Host | `18.225.28.46` | `nslookup api.philross.com` |
+| Platform | **AWS EC2**, `us-east-2` (Ohio) | Reverse DNS: `ec2-18-225-28-46.us-east-2.compute.amazonaws.com` |
+| OS / web server | Ubuntu, nginx 1.24.0 | `Server:` response header |
+| Stack | Django + Django REST Framework | `/swagger/`, `/redoc/`, `/admin/`, `/ckeditor5/` all respond |
+| Auth | JWT | `/accounts/token/refresh/` |
+| AWS account | `070634855513` | Console sign-in URL in the handover doc |
+| SSH (port 22) | Open | `Test-NetConnection 18.225.28.46 -Port 22` |
+
+**It is an ordinary server, not a managed platform.** No Elastic Beanstalk, no Lambda, no container service. That means the Django source lives *on that instance* and changes are made by connecting to it — there is no build pipeline in front of it that we know of, and **no copy of the backend source in any repository we hold.**
+
+### Getting access
+
+The AWS CLI is installed on this machine (`aws-cli/2.36.17`). It needs an IAM **access key pair** — not the console password, which is for browser sign-in only:
+
+```bash
+aws configure        # Access Key ID, Secret Access Key, region us-east-2, json
+```
+
+Create the key at **AWS Console → your username → Security credentials → Create access key → CLI**.
+
+With that, the routes to a shell, in order of preference:
+1. **SSM Session Manager** — `aws ssm start-session --target i-…`. No SSH key needed. Requires the SSM agent and an instance role.
+2. **EC2 Instance Connect** — `aws ec2-instance-connect send-ssh-public-key`. Pushes a temporary key.
+3. **The original `.pem`** — only if the handover included one.
+
+### ⚠️ Security
+
+The handover document contains **live AWS root credentials and an IAM console password**, both belonging to a departed contractor, stored in Google Drive.
+
+- **Rotate both.** They should be assumed compromised.
+- **Enable MFA on root** and then stop using it. AWS's own guidance is that root is for account recovery and billing, never day-to-day work.
+- Give each person their own IAM user, so access can be revoked individually.
+
+Note this is a *separate* exposure from the Codemagic one in Phase 7. Both need rotating.
+
+---
+
+## 12. What The Backend Is Missing
+
+Confirmed against the live schema, not assumed:
+
+```bash
+curl -s "https://api.philross.com/swagger/?format=openapi"
+```
+
+**30 paths.** None of them read or write a user profile. None of them read or write tutorial progress.
+
+| Missing | Breaks | Effort |
+|---|---|---|
+| `GET`/`PATCH /accounts/profile/` | Name change cannot save — the visible bug | ~15 min |
+| `GET /feed/progress/` + `POST /feed/{slug}/completed/` | Completed tutorials lost on reinstall | ~1 hr |
+| Body handling in `video_watched/` + `GET /course/progress/` | `course_completed` always returns `"0 %"` | ~1 hr |
+
+**The app is already written for all three.** `src/services/tutorialProgress.ts` asks the server first and only falls back to its device cache; `updateProfile` sends the correct PATCH; `updateVideoProgress` now sends a real body instead of the empty one it had. Nothing on the mobile side changes when these ship, and **no app release is needed** — the calls simply stop returning 404.
+
+Full contracts and Django implementations: **[BACKEND-REQUIREMENTS.md](BACKEND-REQUIREMENTS.md)**.
