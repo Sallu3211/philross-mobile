@@ -274,7 +274,7 @@ const PaywallScreen = ({ navigation, route }: any) => {
         <Text style={styles.hero}>Train Hard.{'\n'}Live Fearless.</Text>
         {!!trialDays && (
           <View style={styles.trialPill}>
-            <Check size={13} color={theme.color.progress.fillOnDark} />
+            <Check size={13} color={theme.color.accent.onDark} />
             <Text style={styles.trialPillText}>
               {`First ${trialDays} days free — cancel anytime`}
             </Text>
@@ -294,7 +294,7 @@ const PaywallScreen = ({ navigation, route }: any) => {
 
         {loading ? (
           <ActivityIndicator
-            color={theme.color.progress.fillOnDark}
+            color={theme.color.accent.onDark}
             size="large"
             style={styles.loader}
           />
@@ -457,7 +457,7 @@ const styles = StyleSheet.create({
   trialPillText: {
     fontFamily: theme.font.semibold,
     fontSize: theme.type.caption.fontSize,
-    color: theme.color.progress.fillOnDark,
+    color: theme.color.accent.onDark,
   },
   benefits: { gap: theme.space.md },
   benefitRow: { flexDirection: 'row', alignItems: 'center', gap: theme.space.lg },
@@ -507,7 +507,7 @@ const styles = StyleSheet.create({
   },
   planSelected: {
     backgroundColor: 'rgba(224,172,51,0.12)',
-    borderColor: theme.color.progress.fillOnDark,
+    borderColor: theme.color.accent.onDark,
   },
   radio: {
     width: 20,
@@ -518,12 +518,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  radioOn: { borderColor: theme.color.progress.fillOnDark },
+  radioOn: { borderColor: theme.color.accent.onDark },
   radioDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: theme.color.progress.fillOnDark,
+    backgroundColor: theme.color.accent.onDark,
   },
   planText: { flex: 1, minWidth: 0 },
   planTitleRow: { flexDirection: 'row', alignItems: 'center', gap: theme.space.sm },

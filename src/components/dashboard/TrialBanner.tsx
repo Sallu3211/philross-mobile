@@ -46,7 +46,7 @@ const COPY: Record<
   },
   active: {
     icon: Clock,
-    tint: theme.color.progress.fill,
+    tint: theme.color.accent.base,
     title: d =>
       d <= 0
         ? 'Last day of your free week'
@@ -105,7 +105,7 @@ export const TrialBanner: React.FC<TrialBannerProps> = ({
         <LinearMeter
           progress={elapsedPct}
           height={5}
-          color={theme.color.progress.fill}
+          color={theme.color.accent.base}
           trackColor="rgba(255,255,255,0.65)"
         />
       )}
@@ -124,10 +124,10 @@ export const TrialBanner: React.FC<TrialBannerProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: theme.color.progress.subtle,
+    backgroundColor: theme.color.accent.subtle,
     borderRadius: theme.radius.xl,
     borderWidth: 1,
-    borderColor: theme.color.progress.border,
+    borderColor: theme.color.accent.border,
     padding: theme.space.lg,
     gap: theme.space.lg,
   },

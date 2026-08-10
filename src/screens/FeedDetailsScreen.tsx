@@ -123,7 +123,7 @@ const FeedDetailsScreen = ({ route, navigation }: any) => {
     : 'https://philrossapp.link';
 
   const handleSocialShare = async (platform: string) => {
-    const message = `${feedData?.headline ?? 'Master Phil'}\n${shareLink}\n\nGet the Master Phil app:\nAndroid: ${ANDROID_APP_URL}\niOS: ${IOS_APP_URL}`;
+    const message = `${plain(feedData?.headline) || 'Master Phil'}\n${shareLink}\n\nGet the Master Phil app:\nAndroid: ${ANDROID_APP_URL}\niOS: ${IOS_APP_URL}`;
 
     // Instagram has no share-by-URL scheme, so say what actually happened
     // rather than opening a link that does nothing.
@@ -232,7 +232,7 @@ const FeedDetailsScreen = ({ route, navigation }: any) => {
             </View>
           )}
 
-          <Text style={styles.title}>{feedData?.headline || 'Article'}</Text>
+          <Text style={styles.title}>{plain(feedData?.headline) || 'Article'}</Text>
 
           {(feedData?.author || date) && (
             <View style={styles.byline}>

@@ -519,7 +519,7 @@ const styles = StyleSheet.create({
     height: 17,
     paddingHorizontal: 4,
     borderRadius: 9,
-    backgroundColor: theme.color.progress.fill,
+    backgroundColor: theme.color.accent.base,
     alignItems: 'center',
     justifyContent: 'center',
   },

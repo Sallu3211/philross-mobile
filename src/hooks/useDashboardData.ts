@@ -52,7 +52,11 @@ export interface DashboardData {
   planState: PlanState;
   trialDaysLeft: number;
 
+  /** Tutorials — what the hero ring measures. */
   coursesInProgress: number;
+  /** Courses, counted separately from the tutorial ring. */
+  coursesTotal: number;
+  coursesDone: number;
   lockedCount: number;
 
   refresh: () => Promise<void>;
@@ -133,6 +137,8 @@ export function useDashboardData(navigation: any): DashboardData {
   const [completedCount, setCompletedCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
   const [coursesInProgress, setCoursesInProgress] = useState(0);
+  const [coursesTotal, setCoursesTotal] = useState(0);
+  const [coursesDone, setCoursesDone] = useState(0);
   const [lockedCount, setLockedCount] = useState(0);
   const [continueItems, setContinueItems] = useState<ContinueItem[]>([]);
   const [feedItems, setFeedItems] = useState<ContinueItem[]>([]);
@@ -213,29 +219,28 @@ export function useDashboardData(navigation: any): DashboardData {
         const feedAll = toArray(feedRes?.data ?? feedRes);
 
         /**
-         * Tutorials are the thing most people actually work through — courses
-         * are bought separately and many users own none — so the hero counts
-         * both. A tutorial is worth 0 or 100: there is no partial state for
+         * The hero ring measures TUTORIALS ONLY.
+         *
+         * Courses are sold separately through external links at $199–$499 and
+         * most people own none, so folding six of them into the same ring as
+         * 88 tutorials mixed two unrelated things and made the number hard to
+         * reason about. Courses now have their own counters below.
+         *
+         * A tutorial is worth 0 or 100 — there is no partial state for
          * something you either did or did not do.
          */
         const tutorialSlugs = feedAll.map((f: any) => f?.slug);
         const tutorialsDone = countTutorialsDone(tutorialMarks, tutorialSlugs);
+        const tutorialTotal = tutorialSlugs.length;
 
-        const units = [
-          ...tracked.map(x => x.progress),
-          ...tutorialSlugs.map((s: string) =>
-            s && tutorialMarks[s]?.done ? 100 : 0,
-          ),
-        ];
+        setOverallProgress(
+          exactPercent(tutorialTotal > 0 ? (tutorialsDone / tutorialTotal) * 100 : 0),
+        );
+        setCompletedCount(tutorialsDone);
+        setTotalCount(tutorialTotal);
 
-        const avg =
-          units.length > 0
-            ? units.reduce((sum, p) => sum + p, 0) / units.length
-            : 0;
-
-        setOverallProgress(exactPercent(avg));
-        setCompletedCount(done + tutorialsDone);
-        setTotalCount(units.length);
+        setCoursesTotal(tracked.length);
+        setCoursesDone(done);
         setCoursesInProgress(inFlight.length);
 
         setContinueItems(
@@ -297,6 +302,8 @@ export function useDashboardData(navigation: any): DashboardData {
     planState,
     trialDaysLeft,
     coursesInProgress,
+    coursesTotal,
+    coursesDone,
     lockedCount,
     refresh,
   };

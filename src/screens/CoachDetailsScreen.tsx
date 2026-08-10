@@ -105,7 +105,7 @@ const CoachDetailsScreen = ({ route, navigation }: any) => {
     : 'https://philrossapp.link';
 
   const handleSocialShare = async (platform: string) => {
-    const message = `${coachData?.headline ?? 'Coaching with Master Phil'}\n${shareLink}\n\nGet the Master Phil app:\nAndroid: ${ANDROID_APP_URL}\niOS: ${IOS_APP_URL}`;
+    const message = `${plain(coachData?.headline) || 'Coaching with Master Phil'}\n${shareLink}\n\nGet the Master Phil app:\nAndroid: ${ANDROID_APP_URL}\niOS: ${IOS_APP_URL}`;
 
     if (platform === 'instagram') {
       Clipboard.setString(message);
@@ -198,7 +198,7 @@ const CoachDetailsScreen = ({ route, navigation }: any) => {
             )}
 
             <Text style={styles.title}>
-              {coachData?.headline || 'Coaching with Master Phil'}
+              {plain(coachData?.headline) || 'Coaching with Master Phil'}
             </Text>
 
             {!!description && <Text style={styles.body}>{description}</Text>}

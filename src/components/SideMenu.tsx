@@ -244,7 +244,7 @@ const SideMenu = ({ isVisible, onClose, navigation }: SideMenuProps) => {
       route: 'Events',
       label: 'Events',
       icon: Calendar,
-      tint: theme.color.progress.fill,
+      tint: theme.color.accent.base,
       onPress: () => go('Events'),
     },
   ];
@@ -263,7 +263,7 @@ const SideMenu = ({ isVisible, onClose, navigation }: SideMenuProps) => {
       route: 'Testimonials',
       label: 'Testimonials',
       icon: Star,
-      tint: theme.color.progress.fill,
+      tint: theme.color.accent.base,
       onPress: () => go('Testimonials'),
     },
     {
@@ -380,11 +380,20 @@ const SideMenu = ({ isVisible, onClose, navigation }: SideMenuProps) => {
           {/* No name or email here — the profile avatar already sits in the
               top right of every screen, and repeating it made the drawer
               open on the one thing nobody came here to read. */}
-          <View style={styles.planChip}>
+          {/* Solid tinted plate, not a 10%-white wash. The old chip put small
+              amber text on near-black behind a barely-there background, so the
+              one line telling you what you are paying for was the hardest
+              thing in the drawer to read. */}
+          <View
+            style={[
+              styles.planChip,
+              isSubscribed ? styles.planChipPaid : styles.planChipFree,
+            ]}
+          >
             {isSubscribed ? (
-              <Check size={12} color={theme.color.status.successOnDark} />
+              <Check size={13} color={theme.color.status.successOnDark} />
             ) : (
-              <Gift size={12} color={theme.color.progress.fillOnDark} />
+              <Gift size={13} color={theme.color.accent.onDark} />
             )}
             <Text
               style={[
@@ -392,7 +401,7 @@ const SideMenu = ({ isVisible, onClose, navigation }: SideMenuProps) => {
                 {
                   color: isSubscribed
                     ? theme.color.status.successOnDark
-                    : theme.color.progress.fillOnDark,
+                    : theme.color.accent.onDark,
                 },
               ]}
             >
@@ -535,16 +544,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    gap: 5,
+    gap: 6,
     marginTop: theme.space.lg,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
     borderRadius: theme.radius.pill,
-    backgroundColor: 'rgba(255,255,255,0.10)',
+    borderWidth: 1,
+  },
+  /** Amber at 18% plus a matching hairline — legible on black, still quiet. */
+  planChipFree: {
+    backgroundColor: 'rgba(224,172,51,0.18)',
+    borderColor: 'rgba(224,172,51,0.45)',
+  },
+  planChipPaid: {
+    backgroundColor: 'rgba(18,200,138,0.18)',
+    borderColor: 'rgba(18,200,138,0.45)',
   },
   planText: {
     fontFamily: theme.font.semibold,
-    fontSize: theme.type.caption.fontSize,
+    fontSize: theme.type.bodySm.fontSize,
+    letterSpacing: 0.1,
     includeFontPadding: false,
   },
 

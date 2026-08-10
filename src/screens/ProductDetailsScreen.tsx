@@ -113,7 +113,7 @@ const ProductDetailsScreen = ({ route, navigation }: any) => {
   };
 
   const handleSocialShare = async (platform: string) => {
-    const message = `${productData?.headline ?? 'Master Phil'}\n${shareLink}\n\nGet the Master Phil app:\nAndroid: ${ANDROID_APP_URL}\niOS: ${IOS_APP_URL}`;
+    const message = `${plain(productData?.headline) || 'Master Phil'}\n${shareLink}\n\nGet the Master Phil app:\nAndroid: ${ANDROID_APP_URL}\niOS: ${IOS_APP_URL}`;
 
     // Instagram has no share-by-URL scheme, so the honest fallback is the
     // clipboard rather than a link that silently does nothing.
@@ -156,7 +156,7 @@ const ProductDetailsScreen = ({ route, navigation }: any) => {
       <StatusBar barStyle="dark-content" backgroundColor={theme.color.surface.app} />
 
       <ScreenHeader
-        title={productData?.headline || 'Product'}
+        title={plain(productData?.headline) || 'Product'}
         onBack={() => navigation.goBack()}
         right={
           productData ? (
@@ -201,7 +201,7 @@ const ProductDetailsScreen = ({ route, navigation }: any) => {
             </View>
 
             <Text style={styles.title}>
-              {productData?.headline || 'Product'}
+              {plain(productData?.headline) || 'Product'}
             </Text>
 
             {price > 0 && (

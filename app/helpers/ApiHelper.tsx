@@ -1145,17 +1145,25 @@ export const updateProfile = async (
         if (ok(patched)) return patched;
 
         // A 404 means the route does not exist, so retrying with another verb
-        // on the same URL cannot help. As of Aug 2026 the API serves no profile
-        // endpoint at all — `accounts/` exposes only signup, login, verify-otp,
+        // on the same URL cannot help.
+        //
+        // Verified against the live OpenAPI schema (GET /swagger/?format=openapi,
+        // Aug 2026): the API is 30 endpoints and NONE of them read or write a
+        // profile. `accounts/` serves only signup, login, verify-otp,
         // token/refresh, social-auth-login, forgot-password/* and
-        // delete-account. Say so plainly instead of "Request failed", which
-        // reads like the user typed something wrong.
+        // delete-account. There is no workaround on the API side.
+        //
+        // `serverUnsupported` lets the caller fall back to saving on the
+        // device, so the name at least takes effect in the app. Remove that
+        // fallback the day the endpoint lands — this function already sends
+        // exactly the right request and will simply start succeeding.
         if (patched?.httpStatus === 404) {
             return {
                 success: false,
+                serverUnsupported: true,
                 message:
-                    'Changing your name is not supported by the server yet. ' +
-                    'Please contact support.',
+                    'Saved on this device. Your name will sync once the server ' +
+                    'supports profile updates.',
             };
         }
 

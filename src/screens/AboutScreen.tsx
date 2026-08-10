@@ -68,6 +68,13 @@ const AboutScreen = ({ navigation }: any) => {
 
   const body = plain(aboutData?.content);
 
+  /**
+   * The heading needs stripping too. It comes back wrapped by the CMS editor —
+   * `<h2 style="margin-left:0px;">Master Phil: …</h2>` — so rendering it raw
+   * printed the tag and its inline style across the top of the page.
+   */
+  const heading = plain(aboutData?.heading);
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor={theme.color.surface.app} />
@@ -89,9 +96,7 @@ const AboutScreen = ({ navigation }: any) => {
             />
           )}
 
-          <Text style={styles.heading}>
-            {aboutData?.heading || 'Master Phil Ross'}
-          </Text>
+          <Text style={styles.heading}>{heading || 'Master Phil Ross'}</Text>
 
           {body ? (
             <Text style={styles.body}>{body}</Text>

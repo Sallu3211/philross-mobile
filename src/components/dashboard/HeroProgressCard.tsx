@@ -64,7 +64,7 @@ export const HeroProgressCard: React.FC<HeroProgressCardProps> = ({
           <Text style={styles.figValue} allowFontScaling={false}>
             {loading ? '—' : completedCount}
           </Text>
-          <Text style={styles.figLabel}>Completed</Text>
+          <Text style={styles.figLabel}>Tutorials done</Text>
         </View>
         <View style={styles.divider} />
         <View style={styles.fig}>

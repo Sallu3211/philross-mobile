@@ -118,8 +118,18 @@ const ProfileScreen = ({ navigation }: any) => {
       const res: any = await updateProfile({ full_name: name }, navigation);
 
       const ok = res?.success !== false && res?.status !== false;
-      if (!ok) {
-        // Show what the server actually said rather than a generic failure.
+
+      /**
+       * The API has no profile endpoint (confirmed against its OpenAPI schema),
+       * so a 404 is not the user's problem and not something a retry fixes.
+       * Rather than refuse the edit, keep it: UserContext persists to
+       * EncryptedStorage, so the greeting, the avatar initial and the menu all
+       * pick it up and it survives a restart. The one thing it cannot do is
+       * reach the server, and the message says so rather than claiming a save
+       * that did not happen.
+       */
+      if (!ok && !res?.serverUnsupported) {
+        // A real server rejection — show what it actually said.
         const detail =
           typeof res?.message === 'string'
             ? res.message
@@ -134,7 +144,12 @@ const ProfileScreen = ({ navigation }: any) => {
       await setUser({ ...(user as any), fullName: name });
 
       setDirty(false);
-      Alert.alert('Saved', 'Your name has been updated.');
+
+      if (res?.serverUnsupported) {
+        Alert.alert('Saved on this device', res.message);
+      } else {
+        Alert.alert('Saved', 'Your name has been updated.');
+      }
     } finally {
       setSaving(false);
     }
@@ -285,7 +300,7 @@ const ProfileScreen = ({ navigation }: any) => {
                 onValueChange={onToggleNotifications}
                 trackColor={{
                   false: theme.color.neutral[300],
-                  true: theme.color.progress.fill,
+                  true: theme.color.accent.base,
                 }}
                 thumbColor={theme.color.surface.card}
               />

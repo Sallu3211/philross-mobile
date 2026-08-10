@@ -81,16 +81,43 @@ export const theme = {
       onBrand: neutral[0],
     },
 
-    /** Progress meters — rings and bars. One hue, two depths. */
-    progress: {
-      ramp: amber,
-      fill: amber[600],
-      /** Fill used on the dark hero card — a lighter step for contrast. */
-      fillOnDark: '#E0AC33',
-      track: amber[100],
-      trackOnDark: 'rgba(255,255,255,0.14)',
+    /**
+     * Amber accent — the app's third colour, after brand red and the meter fill.
+     *
+     * Everything that is *not* a bar or a ring lives here: the Events and
+     * Testimonials marks in the drawer, the trial banner, the filter-count
+     * badge, the "In progress" tile.
+     *
+     * These used to read `progress.fill`, so changing the meter colour turned
+     * eight unrelated icons green in one edit. A meter and a menu icon are not
+     * the same idea and no longer share a token.
+     */
+    accent: {
+      base: amber[600],
       subtle: amber[50],
       border: 'rgba(194,133,26,0.30)',
+      onDark: '#E0AC33',
+    },
+
+    /**
+     * Progress meters — rings and bars, and nothing else.
+     *
+     * ⚠️ #00FF00 was chosen by the client. It is spectacular on the dark hero
+     * card (12.5:1) and close to invisible on the white cards (1.4:1, where
+     * 3:1 is the floor for a UI component). `fill` therefore keeps the pure
+     * value on request; if a meter ever reads as an empty track on a light
+     * surface, that ratio is why, and #16A34A is the nearest green that clears
+     * the floor while still reading as the same colour.
+     */
+    progress: {
+      ramp: amber,
+      fill: '#00FF00',
+      /** Fill used on the dark hero card, where the pure green is at its best. */
+      fillOnDark: '#00FF00',
+      track: '#E4F7E4',
+      trackOnDark: 'rgba(255,255,255,0.14)',
+      subtle: '#EFFCEF',
+      border: 'rgba(0,180,0,0.30)',
     },
 
     /** Reserved status colours. Always ship with an icon + label — never colour alone. */

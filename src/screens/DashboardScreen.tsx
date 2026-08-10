@@ -172,8 +172,8 @@ const DashboardScreen = ({ navigation }: any) => {
         key: 'events',
         label: 'Events',
         icon: Calendar,
-        tint: theme.color.progress.fill,
-        tintBg: theme.color.progress.subtle,
+        tint: theme.color.accent.base,
+        tintBg: theme.color.accent.subtle,
         onPress: () => navigation.navigate('Events'),
       },
       {
@@ -300,10 +300,9 @@ const DashboardScreen = ({ navigation }: any) => {
           completedCount={d.completedCount}
           totalCount={d.totalCount}
           subtitle={
-            // Keyed off whether anything is actually under way, not off the
-            // course count — the count now falls back to the whole catalogue.
-            d.completedCount === 0 && d.coursesInProgress === 0
-              ? 'Start a course and your progress shows up here.'
+            // The ring counts tutorials only, so the copy names tutorials.
+            d.completedCount === 0
+              ? 'Mark a tutorial done and your progress shows up here.'
               : 'Keep going. Consistency beats intensity.'
           }
           loading={d.loading}
@@ -311,21 +310,27 @@ const DashboardScreen = ({ navigation }: any) => {
 
         {/* 3 ── KPI group. Sits directly under the hero so the three counts read
              as part of the progress story, before any sales messaging.
-             One card, three segments, hairline dividers between them. */}
+             One card, three segments, hairline dividers between them.
+
+             "Courses" is its own count rather than being folded into the ring:
+             they are sold separately at $199–$499 and most people own none, so
+             six of them averaged against 88 tutorials produced a number that
+             meant nothing. */}
         <View style={styles.kpiCard}>
           <StatTile
             value={d.completedCount}
-            label="Completed"
+            label="Tutorials done"
             icon={CheckCircle}
             tint={theme.color.status.success}
             loading={d.loading}
+            onPress={() => navigation.navigate('Feed')}
           />
           <View style={styles.kpiDivider} />
           <StatTile
-            value={d.coursesInProgress}
-            label="In progress"
+            value={d.coursesDone}
+            label={`of ${d.coursesTotal} courses`}
             icon={ProgressCircle}
-            tint={theme.color.progress.fill}
+            tint={theme.color.accent.base}
             loading={d.loading}
             onPress={() => navigation.navigate('Courses')}
           />
