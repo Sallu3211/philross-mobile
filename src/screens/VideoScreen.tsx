@@ -1,847 +1,598 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Dimensions,
-  Platform,
-  Image,
-  StatusBar,
   ActivityIndicator,
-  Linking,
-  Clipboard,
-  ToastAndroid,
   Alert,
-  Share,
+  Clipboard,
+  Image,
+  Linking,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  Share as RNShare,
+  StatusBar,
+  StyleSheet,
+  Text,
+  ToastAndroid,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { getFontFamily } from '../utils/platform';
-import ArrowLeftIcon from '../../assets/icons/arrow-left.svg';
-import BookIcon from '../../assets/icons/solar_book-broken.svg';
-import ShareIcon from '../../assets/icons/Icon.svg';
-import PlayIcon from '../../assets/icons/solar_play-bold.svg';
-import FeedIcon from '../../assets/icons/home.svg';
-import FeedIconRed from '../../assets/icons/Vector.svg';
-import EventsIcon from '../../assets/icons/calendar.svg';
-import ProductsIcon from '../../assets/icons/bag-2.svg';
-import MyCoachIcon from '../../assets/icons/weight.svg';
-import CoursesIcon from '../../assets/icons/teacher.svg';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import Video from 'react-native-video';
+import Orientation from 'react-native-orientation-locker';
+import { theme } from '../theme';
+import ScreenHeader from '../components/ui/ScreenHeader';
+import { ErrorState, LoadingState } from '../components/ui/StateView';
+import { Close, Copy, Play, Share } from '../components/ui/icons';
+import { getFeedItem } from '../../app/helpers/ApiHelper';
+import { pushCleverTapEvent } from '../../App';
 import FbIcon from '../../assets/icons/facebook.png';
 import WhatsAppIcon from '../../assets/icons/whatsapp.png';
 import InstagramIcon from '../../assets/icons/instagram.png';
 import XIcon from '../../assets/icons/x_icon.png';
 import TelegramIcon from '../../assets/icons/telegram.png';
-import Utils from '../../app/helpers/Utilities';
-import share from '../../assets/icons/share.png';
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import DocumentCopyIcon from '../../assets/icons/document-copy.svg';
-import { getFeedItem } from '../../app/helpers/ApiHelper';
-import Video from "react-native-video";
-import Orientation from 'react-native-orientation-locker';
-import { pushCleverTapEvent } from '../../App';
 
-const { width, height } = Dimensions.get('window');
+const ANDROID_APP_URL =
+  'https://play.google.com/store/apps/details?id=com.philross';
+const IOS_APP_URL = 'https://apps.apple.com/us/app/philross/id6751194230';
 
-const VideoScreen = ({ route, navigation }: any) => {
-  const [showShare, setShowShare] = useState(false);
-  
-  // Get source screen from route params
-  const { sourceScreen } = route.params || {};
-  const [videoDetails, setVideoDetails] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const insets = useSafeAreaInsets();
+const toast = (message: string) => {
+  if (Platform.OS === 'android') {
+    ToastAndroid.show(message, ToastAndroid.SHORT);
+  } else {
+    Alert.alert('Copied', message);
+  }
+};
+
+const plain = (html: unknown): string =>
+  String(html ?? '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&#39;|&rsquo;/g, '’')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+const SOCIALS = [
+  { key: 'facebook', label: 'Facebook', png: FbIcon },
+  { key: 'whatsapp', label: 'WhatsApp', png: WhatsAppIcon },
+  { key: 'instagram', label: 'Instagram', png: InstagramIcon },
+  { key: 'twitter', label: 'X', png: XIcon },
+  { key: 'telegram', label: 'Telegram', png: TelegramIcon },
+];
+
+interface PlayerProps {
+  videoUrl: string;
+  thumbnailUrl?: string;
+  title: string;
+}
+
+/**
+ * Poster until tapped, then the real player. Loading the video only on
+ * demand keeps the screen cheap to open on a slow connection.
+ */
+const FeedVideoPlayer: React.FC<PlayerProps> = ({
+  videoUrl,
+  thumbnailUrl,
+  title,
+}) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isBuffering, setIsBuffering] = useState(false);
 
   useEffect(() => {
-    Orientation.unlockAllOrientations();
-    return () => {
-      Orientation.lockToPortrait();
-    };
-  }, []);
-  
-  // Get video data from route params
-  const { videoData } = route.params || {};
-  
-  // Use data directly from route params instead of making API call
-  useEffect(() => {
-    if (videoData?.slug) {
-      setVideoDetails(videoData);
-      fetchFeedDetails(videoData?.slug);
-    } else {
-      setError('No video slug provided');
-    }
-  }, [videoData?.slug]);
-  
-  // Handle social media sharing
-  const handleSocialShare = async (platform: string) => {
-    const androidAppUrl = 'https://play.google.com/store/apps/details?id=com.philross';
-    const iosAppUrl = 'https://apps.apple.com/us/app/philross/id6751194230';
-    const shareMessage = `Master Phil App – Train Smarter. Get Stronger.\nUnlock expert training, fitness routines & the BodyBell Method® – anytime, anywhere!\n\nDownload now:\nAndroid: ${androidAppUrl}\niOS: ${iosAppUrl}`;
-    let shareUrl = '';
+    pushCleverTapEvent('video_viewed', { videoType: 'feed_video', name: title });
+  }, [title]);
 
-    switch (platform) {
-      case 'facebook':
-        shareUrl = `https://www.facebook.com/sharer/sharer.php?quote=${encodeURIComponent(shareMessage)}`;
-        break;
-      case 'whatsapp':
-        shareUrl = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
-        break;
-      case 'twitter':
-        shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareMessage)}`;
-        break;
-      case 'telegram':
-        shareUrl = `tg://msg?text=${encodeURIComponent(shareMessage)}`;
-        break;
-      case 'instagram':
-        try {
-          await Clipboard.setString(shareMessage);
-          if (Platform.OS === 'android') {
-            ToastAndroid.show('Message copied to clipboard', ToastAndroid.SHORT);
-          } else {
-            Alert.alert('Message Copied', 'Master Phil app message copied to clipboard.');
-          }
-        } catch (e) {
-          console.log('Copy failed:', e);
-        }
-        return;
-      default:
-        return;
-    }
-
-    if (shareUrl) {
-      try {
-        await Linking.openURL(shareUrl);
-      } catch (error) {
-        console.log('Failed to open URL:', error);
-        await Share.share({ message: shareMessage });
-      }
-    }
-  };
-
-  // API call for details
-
-  const fetchFeedDetails = async (slug: string) => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      const response = await getFeedItem(slug, navigation);
-      if ((response?.status || response?.success) && response?.data) {
-        setVideoDetails(response?.data);
-      } else {
-        setError('Failed to load article details');
-        return;
-      }
-    } catch (error) {
-      console.error('❌ Error fetching feed details:', error);
-      setError('Failed to load article details');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-
-  
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      
-      {/* Top Navigation Bar */}
-      <View style={styles.topNav}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <ArrowLeftIcon width={24} height={24} />
-        </TouchableOpacity>
-        <Text style={[styles.screenTitle, { fontFamily: getFontFamily('bold') }]}>Video</Text>
-        <View style={styles.headerActions}>
-          {/* <TouchableOpacity style={styles.actionButton}>
-            <BookIcon width={24} height={24} />
-          </TouchableOpacity> */}
-          <TouchableOpacity style={styles.actionButton} onPress={() => setShowShare(true)}>
-            <ShareIcon width={24} height={24} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Main Content */}
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Loading State */}
-        {isLoading && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#B62020" />
-            <Text style={[styles.loadingText, { fontFamily: getFontFamily('body') }]}>
-              Loading video details...
-            </Text>
-          </View>
-        )}
-
-        {/* Error State */}
-        {error && !isLoading && (
-          <View style={styles.errorContainer}>
-            <Text style={[styles.errorText, { fontFamily: getFontFamily('bold') }]}>
-              Error Loading Video
-            </Text>
-            <Text style={[styles.errorMessage, { fontFamily: getFontFamily('body') }]}>
-              {error}
-            </Text>
-                         <TouchableOpacity style={styles.retryButton} onPress={() => {
-               if (videoData?.slug) {
-                 setVideoDetails(videoData);
-                 setIsLoading(false);
-               }
-             }}>
-               <Text style={[styles.retryButtonText, { fontFamily: getFontFamily('bold') }]}>
-                 Retry
-               </Text>
-             </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Video Content - Show only when data is loaded */}
-        {!isLoading && !error && (videoDetails) && (
-          <>
-            {/* Main Video Section */}
-            <View style={styles.videoSection}>
-              <FeedVideoPlayer
-                thumbnailUrl={videoDetails?.cropped_thumbnail_url}
-                videUrl={videoDetails?.video || ''}
-                title={videoDetails?.headline || 'Video Title'}
-              />
-              {/* Video Title and Description */}
-              <View style={styles.videoInfo}>
-                <Text style={[styles.videoTitle, { fontFamily: getFontFamily('heading') }]}>
-                  {videoDetails?.headline || 'Video Title'}
-                </Text>
-                
-                {/* Display multiple categories */}
-                {videoDetails?.tag_category && (
-                  <View style={styles.categoriesContainer}>
-                    {Array.isArray(videoDetails.tag_category) ? (
-                      videoDetails.tag_category.map((category: any, catIndex: number) => (
-                        <View key={catIndex} style={styles.categoryBadge}>
-                          <Text style={[styles.categoryText, { fontFamily: getFontFamily('body') }]}>
-                            {category.name || category}
-                          </Text>
-                        </View>
-                      ))
-                    ) : (
-                      <View style={styles.categoryBadge}>
-                        <Text style={[styles.categoryText, { fontFamily: getFontFamily('body') }]}>
-                          {videoDetails.tag_category.name || videoDetails.tag_category}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                )}
-                
-                <Text style={[styles.videoDescription, { fontFamily: getFontFamily('body') }]}>
-                  {videoDetails?.description || 'Video description will appear here.'}
-                </Text>
-              </View>
+    <View style={styles.stage}>
+      {isPlaying ? (
+        <>
+          <Video
+            source={{
+              uri: videoUrl,
+              bufferConfig: {
+                minBufferMs: 15000,
+                maxBufferMs: 50000,
+                bufferForPlaybackMs: 2500,
+                bufferForPlaybackAfterRebufferMs: 5000,
+                backBufferDurationMs: 120000,
+                cacheSizeMB: 200,
+              },
+            }}
+            style={StyleSheet.absoluteFill}
+            resizeMode="contain"
+            paused={false}
+            controls
+            onLoadStart={() => setIsBuffering(true)}
+            onLoad={() => setIsBuffering(false)}
+            onBuffer={({ isBuffering: b }) => setIsBuffering(b)}
+            controlsStyles={{
+              hideNext: true,
+              hidePrevious: true,
+              hideForward: true,
+            }}
+          />
+          {isBuffering && (
+            <View style={styles.buffer} pointerEvents="none">
+              <ActivityIndicator size="large" color="#FFFFFF" />
             </View>
-
-        {/* Related Content Section */}
-            {videoDetails?.related_feeds && videoDetails.related_feeds.length > 0 && (
-        <View style={styles.relatedSection}>
-          <Text style={[styles.sectionTitle, { fontFamily: getFontFamily('bold') }]}>Related Content</Text>
-                <View style={styles.relatedGrid}>
-                  {videoDetails.related_feeds.slice(0, 2).map((video: any, index: number) => (
-                 <TouchableOpacity 
-                   key={index} 
-                      style={styles.videoCard}
-                      onPress={() => navigation.push('Video', { videoData: video })}
-                    >
-                      <View style={styles.videoCardImage}>
-                        {video.cropped_thumbnail_url || video.thumbnail_url ? (
-                       <Image
-                            source={{ uri: video.cropped_thumbnail_url || video.thumbnail_url }}
-                            style={styles.videoCardThumbnail}
-                         resizeMode="cover"
-                       />
-                     ) : (
-                          <View style={styles.videoCardPlaceholder}>
-                            <PlayIcon width={24} height={24} fill="#FFFFFF" />
-                          </View>
-                        )}
-                        <View style={styles.playButtonOverlay}>
-                          <PlayIcon width={24} height={24} fill="#FFFFFF" />
-                     </View>
-                   </View>
-                      <View style={styles.videoCardContent}>
-                        <Text
-                          style={[styles.videoCardTitle, { fontFamily: getFontFamily('bold') }]}
-                          numberOfLines={2}
-                        >
-                          {video.headline || video.title || 'Video Title'}
-                        </Text>
-                 </View>
-                    </TouchableOpacity>
-                  ))}
-                     </View>
-                   </View>
-             )}
-        </>
-        )}
-      </ScrollView>
-
-      {/* Bottom Navigation */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Feed')}>
-          {sourceScreen === 'Feed' ? (
-            <FeedIconRed width={24} height={24} />
-          ) : (
-          <FeedIcon width={24} height={24} />
           )}
-          <Text style={[styles.navText, sourceScreen === 'Feed' && styles.activeNavText, { fontFamily: getFontFamily('body') }]}>Feed</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Events')}>
-          <EventsIcon width={24} height={24} />
-          <Text style={[styles.navText, sourceScreen === 'Events' && styles.activeNavText, { fontFamily: getFontFamily('body') }]}>Events</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Products')}>
-          <ProductsIcon width={24} height={24} />
-          <Text style={[styles.navText, sourceScreen === 'Products' && styles.activeNavText, { fontFamily: getFontFamily('body') }]}>Products</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('MyCoach')}>
-          <MyCoachIcon width={24} height={24} />
-          <Text style={[styles.navText, sourceScreen === 'MyCoach' && styles.activeNavText, { fontFamily: getFontFamily('body') }]}>My Coach</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Courses')}>
-          <CoursesIcon width={24} height={24} />
-          <Text style={[styles.navText, sourceScreen === 'Courses' && styles.activeNavText, { fontFamily: getFontFamily('body') }]}>Courses</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Share Modal */}
-      {showShare && (
-        <View style={styles.shareOverlay}>
-          <View style={[styles.shareModal, { paddingBottom: insets.bottom }]}>
-            <View style={styles.shareHeader}>
-              <TouchableOpacity onPress={() => setShowShare(false)}>
-                <Text style={styles.closeButton}>✕</Text>
-              </TouchableOpacity>
-            </View>
-            
-            <View style={styles.shareContent}>
-              <View style={styles.shareIconContainer}>
-                <View style={styles.shareIcon}>
-                  <Image source={share} style={{ height: 40, width: 40 }} />
-                </View>
-              </View>
-              <Text style={[styles.shareTitle, { fontFamily: getFontFamily('bold') }]}>Share</Text>
-              
-              <View style={styles.shareLinkSection}>
-                <View style={styles.contentContainer}>
-                  <Text style={[styles.contentText, { fontFamily: getFontFamily('bold') }]}>
-                    PhilRoss App – Train Smarter. Get Stronger.{'\n'}
-                    Unlock expert training, fitness routines & the BodyBell Method® – anytime, anywhere!
-                  </Text>
-                </View>
-                
-                <Text style={[styles.downloadTitle, { fontFamily: getFontFamily('bold') }]}>Download now:</Text>
-                
-                <View style={styles.downloadSection}>
-                  <View style={styles.linkContainer}>
-                    <Text style={[styles.linkText, { fontFamily: getFontFamily('body') }]}>
-                      https://play.google.com/store/apps/details?id=com.philross
-                    </Text>
-                    <TouchableOpacity 
-                      style={styles.copyButton}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                      onPress={() => {
-                        const androidLink = 'https://play.google.com/store/apps/details?id=com.philross';
-                        try {
-                          Clipboard.setString(androidLink);
-                          if (Platform.OS === 'android') {
-                            ToastAndroid.show('Android link copied', ToastAndroid.SHORT);
-                          } else {
-                            Alert.alert('Link Copied', 'Android link copied to clipboard');
-                          }
-                        } catch (e) {
-                          console.log('Copy failed:', e);
-                          Alert.alert('Copy Failed', 'Unable to copy link, please try again.');
-                        }
-                      }}
-                    >
-                      <DocumentCopyIcon width={20} height={20} />
-                    </TouchableOpacity>
-                  </View>
-                  
-                  <View style={styles.linkContainer}>
-                    <Text style={[styles.linkText, { fontFamily: getFontFamily('body') }]}>
-                      https://apps.apple.com/us/app/philross/id6751194230
-                    </Text>
-                    <TouchableOpacity 
-                      style={styles.copyButton}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                      onPress={() => {
-                        const iosLink = 'https://apps.apple.com/us/app/philross/id6751194230';
-                        try {
-                          Clipboard.setString(iosLink);
-                          if (Platform.OS === 'android') {
-                            ToastAndroid.show('iOS link copied', ToastAndroid.SHORT);
-                          } else {
-                            Alert.alert('Link Copied', 'iOS link copied to clipboard');
-                          }
-                        } catch (e) {
-                          console.log('Copy failed:', e);
-                          Alert.alert('Copy Failed', 'Unable to copy link, please try again.');
-                        }
-                      }}
-                    >
-                      <DocumentCopyIcon width={20} height={20} />
-                  </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-              
-              <View style={styles.shareToSection}>
-                <Text style={[styles.shareSectionTitle, { fontFamily: getFontFamily('bold') }]}>Share to</Text>
-                <View style={styles.socialButtons}>
-                  <TouchableOpacity style={styles.socialButton} onPress={() => handleSocialShare('facebook')}>
-                    <Image source={FbIcon} style={styles.socialIcons} resizeMode='contain' />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.socialButton} onPress={() => handleSocialShare('whatsapp')}>
-                    <Image source={WhatsAppIcon} style={styles.socialIcons} resizeMode='contain' />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.socialButton} onPress={() => handleSocialShare('instagram')}>
-                    <Image source={InstagramIcon} style={styles.socialIcons} resizeMode='contain' />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.socialButton} onPress={() => handleSocialShare('twitter')}>
-                   <Image source={XIcon} style={styles.socialIcons} resizeMode='contain' />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.socialButton} onPress={() => handleSocialShare('telegram')}>
-                    <Image source={TelegramIcon} style={styles.socialIcons} resizeMode='contain' />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          </View>
-        </View>
+        </>
+      ) : (
+        <>
+          {!!thumbnailUrl && (
+            <Image
+              source={{ uri: thumbnailUrl }}
+              style={StyleSheet.absoluteFill}
+              resizeMode="cover"
+            />
+          )}
+          <TouchableOpacity
+            style={styles.playBtn}
+            onPress={() => setIsPlaying(true)}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Play video"
+          >
+            <Play size={22} color={theme.color.text.onBrand} />
+          </TouchableOpacity>
+        </>
       )}
     </View>
   );
 };
 
-type VideoType = {
-  videUrl: string;
-  thumbnailUrl: string;
-  title: string;
-};
+const VideoScreen = ({ route, navigation }: any) => {
+  const insets = useSafeAreaInsets();
+  const { videoData } = route.params || {};
 
-const FeedVideoPlayer = (video: VideoType) => {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [videoDetails, setVideoDetails] = useState<any>(videoData ?? null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showShare, setShowShare] = useState(false);
 
   useEffect(() => {
-    pushCleverTapEvent('video_viewed', { videoType: 'feed_video', name: video.title });
-  }, [])
+    Orientation.unlockAllOrientations();
+    return () => Orientation.lockToPortrait();
+  }, []);
+
+  const fetchDetails = useCallback(async () => {
+    if (!videoData?.slug) {
+      setError('This video could not be opened.');
+      setIsLoading(false);
+      return;
+    }
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const response = await getFeedItem(videoData.slug, navigation);
+
+      if ((response?.status || response?.success) && response?.data) {
+        setVideoDetails(response.data);
+      } else if (videoData) {
+        // The list already carried enough to play; a failed refresh should
+        // not blank a screen that could have worked.
+        setVideoDetails(videoData);
+      } else {
+        setError('We could not load this video.');
+      }
+    } catch (e) {
+      if (videoData) {
+        setVideoDetails(videoData);
+      } else {
+        setError('We could not load this video.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, [videoData, navigation]);
+
+  useEffect(() => {
+    fetchDetails();
+  }, [fetchDetails]);
+
+  const shareLink = videoDetails?.slug
+    ? `https://philrossapp.link/video/${videoDetails.slug}`
+    : 'https://philrossapp.link';
+
+  const handleSocialShare = async (platform: string) => {
+    const message = `${videoDetails?.headline ?? 'Master Phil'}\n${shareLink}\n\nGet the Master Phil app:\nAndroid: ${ANDROID_APP_URL}\niOS: ${IOS_APP_URL}`;
+
+    if (platform === 'instagram') {
+      Clipboard.setString(message);
+      toast('Link copied — paste it into Instagram');
+      return;
+    }
+
+    const urls: Record<string, string> = {
+      facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareLink)}`,
+      whatsapp: `https://wa.me/?text=${encodeURIComponent(message)}`,
+      twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(message)}`,
+      telegram: `https://t.me/share/url?url=${encodeURIComponent(shareLink)}&text=${encodeURIComponent(message)}`,
+    };
+
+    const url = urls[platform];
+    if (!url) return;
+
+    try {
+      await Linking.openURL(url);
+    } catch (e) {
+      await RNShare.share({ message });
+    }
+  };
+
+  const categories: string[] = (() => {
+    const raw = videoDetails?.tag_category;
+    if (!raw) return [];
+    const list = Array.isArray(raw) ? raw : [raw];
+    return list.map((c: any) => String(c?.name ?? c ?? '').trim()).filter(Boolean);
+  })();
+
+  const related: any[] = Array.isArray(videoDetails?.related_feeds)
+    ? videoDetails.related_feeds.slice(0, 4)
+    : [];
+
+  const description = plain(videoDetails?.description);
 
   return (
-    <View style={styles.videoContainer}>
-      {isPlaying ? (<>
-        <Video
-          source={{
-            uri: video.videUrl,
-            bufferConfig: {
-              minBufferMs: 15000,
-              maxBufferMs: 50000,
-              bufferForPlaybackMs: 2500,
-              bufferForPlaybackAfterRebufferMs: 5000,
-              backBufferDurationMs: 120000,
-              cacheSizeMB: 200,
-            }
-          }}
-          style={styles.video}
-          resizeMode="contain"
-          paused={false}
-          onLoadStart={() => setIsLoading(true)}
-          onLoad={() => setIsLoading(false)}
-          onBuffer={({ isBuffering }) => setIsLoading(isBuffering)}
-          controls={true}
-          controlsStyles={{ hideNext: true, hidePrevious: true, hideForward: true}}
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <StatusBar barStyle="dark-content" backgroundColor={theme.color.surface.app} />
+
+      <ScreenHeader
+        title="Video"
+        onBack={() => navigation.goBack()}
+        right={
+          videoDetails ? (
+            <TouchableOpacity
+              style={styles.iconBtn}
+              onPress={() => setShowShare(true)}
+              hitSlop={theme.hitSlop}
+              accessibilityRole="button"
+              accessibilityLabel="Share video"
+            >
+              <Share size={18} color={theme.color.text.primary} />
+            </TouchableOpacity>
+          ) : undefined
+        }
+      />
+
+      {isLoading ? (
+        <LoadingState label="Loading" />
+      ) : error || !videoDetails ? (
+        <ErrorState
+          message={error ?? 'We could not load this video.'}
+          onRetry={fetchDetails}
         />
-        {isLoading && (
-          <View style={styles.loaderOverlay}>
-            <ActivityIndicator size="large" color="#fff" />
-          </View>
-        )}
-      </>
       ) : (
-        <>
-          <Image
-            source={{ uri: video.thumbnailUrl }}
-            style={styles.thumbnail} />
-          <TouchableOpacity
-            style={styles.playBtn}
-            onPress={() => setIsPlaying(true)}>
-            <PlayIcon width={40} height={40} fill="#FFFFFF" />
-          </TouchableOpacity>
-        </>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+        >
+          <FeedVideoPlayer
+            videoUrl={videoDetails?.video ?? ''}
+            thumbnailUrl={videoDetails?.cropped_thumbnail_url}
+            title={videoDetails?.headline ?? 'Video'}
+          />
+
+          {categories.length > 0 && (
+            <View style={styles.tags}>
+              {categories.map(c => (
+                <View key={c} style={styles.tag}>
+                  <Text style={styles.tagText}>{c}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          <Text style={styles.title}>{videoDetails?.headline || 'Video'}</Text>
+
+          {!!description && <Text style={styles.body}>{description}</Text>}
+
+          {related.length > 0 && (
+            <View style={styles.more}>
+              <Text style={styles.sectionLabel}>More to watch</Text>
+              {related.map((v: any, i: number) => (
+                <TouchableOpacity
+                  key={v?.slug ?? i}
+                  style={styles.moreRow}
+                  activeOpacity={0.75}
+                  onPress={() => navigation.push('Video', { videoData: v })}
+                >
+                  <View style={styles.moreThumbWrap}>
+                    <Image
+                      source={{
+                        uri: v?.cropped_thumbnail_url || v?.thumbnail_url,
+                      }}
+                      style={styles.moreThumb}
+                      resizeMode="cover"
+                    />
+                    <View style={styles.moreBadge}>
+                      <Play size={11} color={theme.color.text.onBrand} />
+                    </View>
+                  </View>
+                  <Text style={styles.moreTitle} numberOfLines={2}>
+                    {v?.headline || v?.title || 'Video'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </ScrollView>
       )}
-    </View>
+
+      <Modal
+        visible={showShare}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowShare(false)}
+      >
+        <Pressable style={styles.overlay} onPress={() => setShowShare(false)}>
+          <Pressable
+            style={[
+              styles.sheet,
+              { paddingBottom: Math.max(insets.bottom, theme.space.xl) },
+            ]}
+            onPress={e => e.stopPropagation()}
+          >
+            <View style={styles.grabber} />
+
+            <View style={styles.sheetHead}>
+              <Text style={styles.sheetTitle}>Share video</Text>
+              <TouchableOpacity
+                onPress={() => setShowShare(false)}
+                hitSlop={theme.hitSlop}
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+              >
+                <Close size={17} color={theme.color.text.muted} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.linkRow}>
+              <Text style={styles.linkText} numberOfLines={1}>
+                {shareLink}
+              </Text>
+              <TouchableOpacity
+                style={styles.copyBtn}
+                onPress={() => {
+                  Clipboard.setString(shareLink);
+                  toast('Link copied');
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Copy link"
+              >
+                <Copy size={16} color={theme.color.text.secondary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.socialRow}>
+              {SOCIALS.map(s => (
+                <TouchableOpacity
+                  key={s.key}
+                  style={styles.social}
+                  onPress={() => handleSocialShare(s.key)}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Share on ${s.label}`}
+                >
+                  <View style={styles.socialDisc}>
+                    <Image
+                      source={s.png}
+                      style={styles.socialImg}
+                      resizeMode="contain"
+                    />
+                  </View>
+                  <Text style={styles.socialLabel} numberOfLines={1}>
+                    {s.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  topNav: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  safe: { flex: 1, backgroundColor: theme.color.surface.app },
+  iconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: theme.radius.md,
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 50 : 30,
-    paddingBottom: 15,
-  },
-  backButton: {
-    padding: 5,
-  },
-  screenTitle: {
-    fontSize: 18,
-    fontFamily: getFontFamily('bold'),
-    color: '#000000',
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  actionButton: {
-    padding: 8,
-    marginLeft: 15,
+    justifyContent: 'center',
+    backgroundColor: theme.color.surface.card,
+    borderWidth: 1,
+    borderColor: theme.color.border.subtle,
   },
   content: {
-    flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: theme.space.screen,
+    paddingBottom: theme.space['5xl'],
   },
-  videoSection: {
-    marginTop: 20,
-    marginBottom: 30,
-  },
-  videoInfo: {
-    marginTop: 10,
-    marginBottom: 20,
-  },
-  videoTitle: {
-    fontSize: 18,
-    lineHeight: 20,
-    fontFamily: getFontFamily('bold'),
-    color: '#000000',
-    marginBottom: 12,
-  },
-  videoDescription: {
-    fontSize: 12,
-    color: '#666666',
-    lineHeight: 16,
-  },
-  relatedSection: {
-    marginBottom: 30,
-    paddingLeft: 2,
-    paddingRight: 20,
-  },
-  relatedGrid: {
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
-    gap: 16,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontFamily: getFontFamily('bold'),
-    color: '#000000',
-    marginBottom: 20,
-  },
-  videoCard: {
-    width: (width - 56) / 2,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+
+  stage: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: 16,
     overflow: 'hidden',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    marginBottom: 10,
-  },
-  videoCardImage: {
-    width: '100%',
-    height: 120,
     backgroundColor: '#000000',
-    justifyContent: 'center',
     alignItems: 'center',
-    position: 'relative',
-  },
-  videoCardThumbnail: {
-    width: '100%',
-    height: '100%',
-  },
-  videoCardPlaceholder: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#F5F5F5',
     justifyContent: 'center',
-    alignItems: 'center',
   },
-  playButtonOverlay: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: [{ translateX: -12 }, { translateY: -12 }],
-    width: 24,
-    height: 24,
+  buffer: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.25)',
+  },
+  playBtn: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.color.brand.base,
+    // Nudged right: the play triangle's optical centre sits left of its box.
+    paddingLeft: 3,
   },
-  videoCardContent: {
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-  },
-  videoCardTitle: {
-    fontSize: 12,
-    color: '#000000',
-    lineHeight: 16,
-    fontFamily: getFontFamily('heading'),
-  },
-  bottomNav: {
+
+  tags: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    paddingBottom: Platform.OS === 'ios' ? 20 : 0,
+    flexWrap: 'wrap',
+    gap: theme.space.xs,
+    marginTop: theme.space.lg,
   },
-  navItem: {
+  tag: {
+    backgroundColor: theme.color.brand.subtle,
+    borderRadius: 999,
+    paddingHorizontal: theme.space.md,
+    paddingVertical: 4,
+  },
+  tagText: {
+    fontFamily: theme.font.semibold,
+    fontSize: theme.type.caption.fontSize,
+    color: theme.color.brand.base,
+  },
+
+  title: {
+    fontFamily: theme.font.bold,
+    fontSize: theme.type.h1.fontSize,
+    lineHeight: theme.type.h1.lineHeight,
+    letterSpacing: theme.type.h1.letterSpacing,
+    color: theme.color.text.primary,
+    marginTop: theme.space.md,
+  },
+  body: {
+    fontFamily: theme.font.regular,
+    fontSize: theme.type.body.fontSize,
+    lineHeight: 23,
+    color: theme.color.text.secondary,
+    marginTop: theme.space.md,
+  },
+
+  sectionLabel: {
+    fontFamily: theme.font.semibold,
+    fontSize: theme.type.overline.fontSize,
+    letterSpacing: theme.type.overline.letterSpacing,
+    textTransform: 'uppercase',
+    color: theme.color.text.muted,
+  },
+  more: { marginTop: theme.space['3xl'], gap: theme.space.md },
+  moreRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space.lg,
+    backgroundColor: theme.color.surface.card,
+    borderRadius: 14,
+    padding: theme.space.sm,
+  },
+  moreThumbWrap: {
+    width: 96,
+    height: 62,
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: theme.color.neutral[200],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  moreThumb: { ...StyleSheet.absoluteFillObject },
+  moreBadge: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(182,32,32,0.92)',
+    paddingLeft: 2,
+  },
+  moreTitle: {
     flex: 1,
-    alignItems: 'center',
-    paddingVertical: 8,
+    fontFamily: theme.font.semibold,
+    fontSize: theme.type.bodySm.fontSize,
+    lineHeight: 19,
+    color: theme.color.text.primary,
+    paddingRight: theme.space.sm,
   },
-  navText: {
-    fontSize: 12,
-    color: '#666666',
-    marginTop: 4,
-  },
-  activeNavText: {
-    color: '#B62020',
-    fontFamily: getFontFamily('heading'),
-  },
-  shareOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+
+  overlay: {
+    flex: 1,
+    backgroundColor: theme.color.surface.overlay,
     justifyContent: 'flex-end',
-    alignItems: 'center',
-    zIndex: 1000,
   },
-  shareModal: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-    padding: 0, // Remove all padding
-    width: '100%',
-    // height: '100%', // Full screen height
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    // top: 250, // Moved up to provide more space at bottom
+  sheet: {
+    backgroundColor: theme.color.surface.card,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    paddingHorizontal: theme.space.xl,
+    paddingTop: theme.space.md,
   },
-  shareHeader: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    paddingTop: 10,
-    paddingRight: 20, // Add right padding for close button
+  grabber: {
+    alignSelf: 'center',
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: theme.color.border.default,
+    marginBottom: theme.space.lg,
   },
-  closeButton: {
-    fontSize: 24,
-    color: '#000000',
-    fontFamily: getFontFamily('bold'),
-    padding: 5,
-  },
-  shareContent: {
-    alignItems: 'center',
-    paddingTop: 15,
-    paddingHorizontal: 20, // Add horizontal padding to content
-  },
-  shareIconContainer: {
-    marginBottom: 2,
-  },
-  shareIcon: {
-    width: 80,
-    height: 80,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#B62020',
-    borderRadius: 40,
-  },
-  shareTitle: {
-    fontSize: 24,
-    fontFamily: getFontFamily('bold'),
-    color: '#000000',
-    marginBottom: 30,
-  },
-  shareLinkSection: {
-    width: '100%',
-    marginBottom: 30,
-  },
-  shareSectionTitle: {
-    fontSize: 16,
-    fontFamily: getFontFamily('bold'),
-    color: '#000000',
-    marginBottom: 15,
-  },
-  contentContainer: {
-    marginBottom: 20,
-  },
-  contentText: {
-    fontSize: 14,
-    color: '#000000',
-    lineHeight: 20,
-    fontFamily: getFontFamily('bold'),
-    textAlign: 'center',
-  },
-  downloadTitle: {
-    fontSize: 16,
-    fontFamily: getFontFamily('bold'),
-    color: '#000000',
-    marginBottom: 20,
-    marginTop: -2,
-  },
-  downloadSection: {
-    gap: 12,
-    marginBottom: 40,
-    marginTop: -10,
-  },
-  linkContainer: {
+  sheetHead: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 8,
-    paddingHorizontal: 15,
-    paddingVertical: 12,
+    justifyContent: 'space-between',
+  },
+  sheetTitle: {
+    fontFamily: theme.font.bold,
+    fontSize: theme.type.h2.fontSize,
+    color: theme.color.text.primary,
+  },
+  linkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space.md,
+    backgroundColor: theme.color.surface.sunken,
+    borderRadius: theme.radius.md,
+    paddingLeft: theme.space.lg,
+    paddingRight: theme.space.xs,
+    paddingVertical: theme.space.xs,
+    marginTop: theme.space.lg,
   },
   linkText: {
     flex: 1,
-    fontSize: 14,
-    color: '#666666',
+    fontFamily: theme.font.regular,
+    fontSize: theme.type.caption.fontSize,
+    color: theme.color.text.secondary,
   },
-  copyButton: {
-    padding: 5,
+  copyBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: theme.radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.color.surface.card,
   },
-  shareToSection: {
-    width: '100%',
-    marginBottom: 10,
-  },
-  socialButtons: {
+  socialRow: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 0,
+    justifyContent: 'space-between',
+    marginTop: theme.space.xl,
   },
-  socialButton: {
+  social: { alignItems: 'center', gap: theme.space.xs, width: 58 },
+  socialDisc: {
     width: 50,
     height: 50,
     borderRadius: 25,
-    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'transparent', // Transparent background
-  },
-  // Loading and Error States
-  loadingContainer: {
-    flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 50,
+    backgroundColor: theme.color.surface.sunken,
   },
-  loadingText: {
-    fontSize: 16,
-    color: '#666666',
-    marginTop: 15,
-    textAlign: 'center',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 50,
-    paddingHorizontal: 20,
-  },
-  errorText: {
-    fontSize: 18,
-    color: '#B62020',
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  errorMessage: {
-    fontSize: 14,
-    color: '#666666',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  retryButton: {
-    backgroundColor: '#B62020',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    fontSize: 16,
-    color: '#FFFFFF',
-    fontFamily: getFontFamily('bold'),
-  },
-
-  videoContainer: {
-    width: "100%",
-    aspectRatio: 16 / 9,
-    backgroundColor: "black",
-    borderRadius: 12,
-    overflow: "hidden",
-  },
-  thumbnail: {
-    width: "100%",
-    aspectRatio: 16 / 9,
-    resizeMode: "cover",
-  },
-  video: {
-    width: "100%",
-    aspectRatio: 16 / 9,
-  },
-  playBtn: {
-    position: "absolute",
-    top: "40%",
-    left: "40%",
-  },
-
-  loaderOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.3)",
-    zIndex: 1,
-  },
-  categoriesContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 10,
-    marginBottom: 15,
-  },
-  categoryBadge: {
-    backgroundColor: '#F0F0F0',
-    borderRadius: 15,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  categoryText: {
-    fontSize: 12,
-    color: '#666666',
-  },
-  socialIcons: {
-    width: Utils.normalize(48),
-    height: Utils.normalize(48),
+  socialImg: { width: 24, height: 24 },
+  socialLabel: {
+    fontFamily: theme.font.regular,
+    fontSize: theme.type.caption.fontSize,
+    color: theme.color.text.muted,
   },
 });
 

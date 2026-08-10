@@ -1,153 +1,89 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Platform,
-  Dimensions,
-} from 'react-native';
-import { getFontFamily, getColors } from '../utils/platform';
-import ArrowLeftIcon from '../../assets/icons/arrow-left.svg';
-import ShareIcon from '../../assets/icons/Icon.svg';
-import MaskGroupIcon from '../../assets/icons/Mask group.svg';
+import { StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { theme } from '../theme';
+import { Check } from '../components/ui/icons';
 
-const { width } = Dimensions.get('window');
+const ApplicationConfirmationScreen = ({ navigation }: any) => (
+  <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+    <StatusBar barStyle="dark-content" backgroundColor={theme.color.surface.app} />
 
-const ApplicationConfirmationScreen = ({ navigation }: any) => {
-  const colors = getColors();
-
-  const handleBack = () => {
-    navigation.goBack();
-  };
-
-  const handleShare = () => {
-    // Handle share functionality
-    console.log('Share confirmation');
-  };
-
-  const handleReturnToFeed = () => {
-    navigation.navigate('Dashboard');
-  };
-
-  return (
-    <View style={styles.container}>
-      {/* Top Navigation */}
-      <View style={styles.topNav}>
-        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-          <ArrowLeftIcon width={24} height={24} />
-        </TouchableOpacity>
-        <Text style={[styles.title, { fontFamily: getFontFamily('bold') }]}>
-          Thank You!
-        </Text>
-        <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
-          <ShareIcon width={24} height={24} />
-        </TouchableOpacity>
+    {/* No back or share here on purpose. The application is already sent;
+        the only useful move is forward. */}
+    <View style={styles.content}>
+      <View style={styles.badge}>
+        <Check size={38} color={theme.color.text.inverse} />
       </View>
 
-      {/* Content */}
-      <View style={styles.content}>
-        {/* Success Icon */}
-        <View style={styles.iconContainer}>
-          <MaskGroupIcon width={120} height={120} />
-        </View>
+      <Text style={styles.title}>Application sent</Text>
 
-        {/* Success Message */}
-        <Text style={[styles.successTitle, { fontFamily: getFontFamily('bold') }]}>
-          Your Application is Submitted!
-        </Text>
-
-        <Text style={[styles.successMessage, { fontFamily: getFontFamily('body') }]}>
-          Master Phil's team will review your details with precision and contact you within 24-48 hours to forge your personalized coaching plan. Get ready to activate your potential!
-        </Text>
-
-      </View>
-
-      {/* Return to Feed Button - Full Width */}
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.returnButton} onPress={handleReturnToFeed}>
-          <Text style={[styles.returnButtonText, { fontFamily: getFontFamily('bold') }]}>
-            RETURN TO FEED
-          </Text>
-        </TouchableOpacity>
-      </View>
+      <Text style={styles.body}>
+        Master Phil's team will review your details and get back to you within
+        24 to 48 hours to build your coaching plan.
+      </Text>
     </View>
-  );
-};
+
+    <View style={styles.bar}>
+      <TouchableOpacity
+        style={styles.cta}
+        onPress={() => navigation.navigate('Dashboard')}
+        activeOpacity={0.9}
+        accessibilityRole="button"
+      >
+        <Text style={styles.ctaText}>Back to dashboard</Text>
+      </TouchableOpacity>
+    </View>
+  </SafeAreaView>
+);
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  topNav: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 70 : 50,
-    paddingBottom: 20,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-  },
-  title: {
-    fontSize: 18,
-    fontFamily: getFontFamily('bold'),
-    color: '#000000',
-    flex: 1,
-    textAlign: 'center',
-  },
-  shareButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'flex-end',
-  },
+  safe: { flex: 1, backgroundColor: theme.color.surface.app },
   content: {
     flex: 1,
+    alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: theme.space['3xl'],
+  },
+  badge: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
     alignItems: 'center',
-    paddingHorizontal: 40,
-    paddingBottom: 40,
+    justifyContent: 'center',
+    backgroundColor: theme.color.status.success,
+    marginBottom: theme.space['2xl'],
   },
-  iconContainer: {
-    marginBottom: 32,
-  },
-  successTitle: {
-    fontSize: 24,
-    fontFamily: getFontFamily('bold'),
-    color: '#000000',
-    marginBottom: 24,
-    textAlign: 'center',
-    lineHeight: 32,
-  },
-  successMessage: {
-    fontSize: 16,
-    color: '#000000',
-    lineHeight: 24,
-    marginBottom: 48,
+  title: {
+    fontFamily: theme.font.bold,
+    fontSize: theme.type.display.fontSize,
+    lineHeight: theme.type.display.lineHeight,
+    letterSpacing: theme.type.display.letterSpacing,
+    color: theme.color.text.primary,
     textAlign: 'center',
   },
-  buttonContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
+  body: {
+    fontFamily: theme.font.regular,
+    fontSize: theme.type.body.fontSize,
+    lineHeight: 23,
+    color: theme.color.text.secondary,
+    textAlign: 'center',
+    marginTop: theme.space.md,
   },
-  returnButton: {
-    backgroundColor: '#B62020',
-    borderRadius: 30,
-    paddingVertical: 12,
+  bar: {
+    paddingHorizontal: theme.space.screen,
+    paddingBottom: theme.space.lg,
+  },
+  cta: {
     alignItems: 'center',
-    width: '100%',
+    justifyContent: 'center',
+    minHeight: 52,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.color.brand.base,
   },
-  returnButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontFamily: getFontFamily('bold'),
+  ctaText: {
+    fontFamily: theme.font.semibold,
+    fontSize: theme.type.h3.fontSize,
+    color: theme.color.text.onBrand,
   },
 });
 
