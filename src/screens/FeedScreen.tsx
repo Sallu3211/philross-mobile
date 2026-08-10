@@ -74,7 +74,7 @@ const FeedScreen = ({ navigation }: any) => {
     useCallback(() => {
       fetchFeedData();
       // Re-read on focus so a tutorial just marked done shows its tick.
-      loadTutorialProgress().then(setTutorialProgress);
+      loadTutorialProgress(navigation).then(setTutorialProgress);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigation])
   );

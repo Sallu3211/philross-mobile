@@ -685,13 +685,20 @@ export const updateVideoProgress = async (videoData: {
     try {
         console.log('📊 Updating video progress:', videoData);
         
+        // The body used to be entirely commented out, so the server received a
+        // bare ping and could never know how far through a video anyone was —
+        // which is why `course_completed` comes back as "0 %" no matter how
+        // much has been watched. The fields are sent now; a backend that
+        // ignores unknown keys is unaffected, one that reads them starts
+        // recording real progress.
         const response = await apiCall({
             endPoint: `course/${videoData.video_id}/video_watched/`,
             method: 'POST',
             data: {
-                // video_id: videoData.video_id,
-                // watch_percentage: videoData.watch_percentage,
-                // is_completed: videoData.is_completed
+                video_id: videoData.video_id,
+                course_id: videoData.course_id,
+                watch_percentage: videoData.watch_percentage,
+                is_completed: videoData.is_completed,
             },
             navigation: navigation,
             isMultipart: false
@@ -740,6 +747,60 @@ export const getCourseProgress = async (courseId: number, navigation: any) => {
     } catch (error) {
         console.error('Get Course Progress Error:', error);
         return { success: false, message: 'Failed to fetch course progress.' };
+    }
+};
+
+/* ── Tutorial (feed) completion ──────────────────────────────────────────────
+ *
+ * These call endpoints the API does not serve yet. They are written now, and
+ * wired into src/services/tutorialProgress.ts, so that the day the backend
+ * ships them the app starts syncing with no further change: progress will
+ * follow the account across devices and survive a reinstall.
+ *
+ * Until then both return `serverUnsupported` and the service falls back to its
+ * on-device cache. See BACKEND-REQUIREMENTS.md for the exact contract.
+ */
+
+/** GET /feed/progress/ → { data: [{ slug, is_completed, completed_at }] } */
+export const getFeedProgress = async (navigation: any) => {
+    try {
+        const response: any = await apiCall({
+            endPoint: 'feed/progress/',
+            method: 'GET',
+            navigation,
+            isMultipart: false,
+        });
+
+        if (response?.httpStatus === 404) {
+            return { success: false, serverUnsupported: true };
+        }
+        return response;
+    } catch (error) {
+        return { success: false, message: 'Failed to fetch tutorial progress.' };
+    }
+};
+
+/** POST /feed/{slug}/completed/ ← { is_completed } */
+export const setFeedCompleted = async (
+    slug: string,
+    isCompleted: boolean,
+    navigation: any,
+) => {
+    try {
+        const response: any = await apiCall({
+            endPoint: `feed/${slug}/completed/`,
+            method: 'POST',
+            data: { is_completed: isCompleted },
+            navigation,
+            isMultipart: false,
+        });
+
+        if (response?.httpStatus === 404) {
+            return { success: false, serverUnsupported: true };
+        }
+        return response;
+    } catch (error) {
+        return { success: false, message: 'Failed to save tutorial progress.' };
     }
 };
 

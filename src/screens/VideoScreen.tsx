@@ -181,25 +181,25 @@ const VideoScreen = ({ route, navigation }: any) => {
 
   useEffect(() => {
     let alive = true;
-    readDone(slug).then(v => alive && setDoneState(v));
+    readDone(slug, navigation).then(v => alive && setDoneState(v));
     return () => {
       alive = false;
     };
-  }, [slug]);
+  }, [slug, navigation]);
 
   const toggleDone = useCallback(async () => {
     if (!slug) return;
     const next = !done;
     setDoneState(next); // Optimistic: the write is local and cannot fail loudly.
-    await writeDone(slug, next);
-  }, [slug, done]);
+    await writeDone(slug, next, navigation);
+  }, [slug, done, navigation]);
 
   /** Playing to the end marks it without the user having to say so. */
   const markWatched = useCallback(async () => {
     if (!slug || done) return;
     setDoneState(true);
-    await writeDone(slug, true);
-  }, [slug, done]);
+    await writeDone(slug, true, navigation);
+  }, [slug, done, navigation]);
 
   const fetchDetails = useCallback(async () => {
     if (!videoData?.slug) {

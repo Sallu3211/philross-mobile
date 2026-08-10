@@ -98,11 +98,23 @@ const ProfileScreen = ({ navigation }: any) => {
       const pref = await EncryptedStorage.getItem(NOTIF_PREF_KEY).catch(() => null);
       if (pref !== null) setNotifications(pref === 'true');
 
+      // The server is the source of truth for the name. When the profile
+      // endpoint exists, whatever it returns overwrites both the field and
+      // the cached user — so a name changed on another device shows up here,
+      // and a reinstall recovers it rather than starting blank.
       const res: any = await getProfile(navigation).catch(() => null);
       const data = res?.data ?? res;
       const serverName = data?.full_name ?? data?.user?.full_name;
-      if (serverName) setFullName(serverName);
+      if (serverName) {
+        setFullName(serverName);
+        if (serverName !== user?.fullName) {
+          await setUser({ ...(user as any), fullName: serverName });
+        }
+      }
     })();
+    // Runs once per screen entry. `user` and `setUser` are deliberately out:
+    // this effect writes to the user it reads, so listing them would loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigation]);
 
   const onSave = useCallback(async () => {

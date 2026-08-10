@@ -159,7 +159,7 @@ export function useDashboardData(navigation: any): DashboardData {
           getCourseList(navigation).catch(() => null),
           getFeedList(navigation).catch(() => null),
           readPlanState(),
-          loadTutorialProgress(),
+          loadTutorialProgress(navigation),
         ]);
 
         setPlanState(plan.state);
