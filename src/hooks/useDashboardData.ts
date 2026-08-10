@@ -23,6 +23,11 @@ import EncryptedStorage from 'react-native-encrypted-storage';
 import Purchases from 'react-native-purchases';
 import { getCourseList, getFeedList } from '../../app/helpers/ApiHelper';
 import type { ContinueItem } from '../components/dashboard/ContinueCard';
+import { exactPercent } from '../utils/percent';
+import {
+  countDone as countTutorialsDone,
+  loadAll as loadTutorialProgress,
+} from '../services/tutorialProgress';
 
 /** Length of the introductory free period, in days. */
 export const FREE_TRIAL_DAYS = 7;
@@ -140,10 +145,15 @@ export function useDashboardData(navigation: any): DashboardData {
       setError(null);
 
       try {
-        const [courseRes, feedRes, plan] = await Promise.all([
-          getCourseList(navigation, { limit: 20 }).catch(() => null),
-          getFeedList(navigation, { limit: 12 }).catch(() => null),
+        // No `limit`. A limit here silently made the percentage a fraction of
+        // a page rather than of the catalogue: asking for 12 tutorials out of
+        // 88 meant one completed tutorial read as 8%, not 1%. Both endpoints
+        // return the full set in one response (`next: null`).
+        const [courseRes, feedRes, plan, tutorialMarks] = await Promise.all([
+          getCourseList(navigation).catch(() => null),
+          getFeedList(navigation).catch(() => null),
           readPlanState(),
+          loadTutorialProgress(),
         ]);
 
         setPlanState(plan.state);
@@ -185,24 +195,47 @@ export function useDashboardData(navigation: any): DashboardData {
           );
         }
 
-        // The course endpoint returns no `is_enrolled` field, so "started" can
-        // only mean progress above zero. Before anyone has started anything the
-        // hero would read 0 of 0, which looks broken — so fall back to the full
-        // catalogue as the denominator: "0 of 6 complete" is true and useful.
-        const started = withProgress.filter(x => x.progress > 0);
-        const tracked = started.length > 0 ? started : withProgress;
+        /**
+         * The whole catalogue is the denominator, always.
+         *
+         * This used to narrow to "courses you have started" as soon as you
+         * started one, which made the number move for the wrong reason:
+         * finishing your first course out of six jumped the ring from 17% to
+         * 100%, because the denominator had quietly shrunk from 6 to 1. A
+         * denominator that changes with your progress is not a percentage.
+         */
+        const tracked = withProgress;
 
         const done = tracked.filter(x => x.progress >= 100).length;
         const inFlight = tracked.filter(x => x.progress > 0 && x.progress < 100);
 
+        /* ── Tutorials → the other half of the progress story ─────────────── */
+        const feedAll = toArray(feedRes?.data ?? feedRes);
+
+        /**
+         * Tutorials are the thing most people actually work through — courses
+         * are bought separately and many users own none — so the hero counts
+         * both. A tutorial is worth 0 or 100: there is no partial state for
+         * something you either did or did not do.
+         */
+        const tutorialSlugs = feedAll.map((f: any) => f?.slug);
+        const tutorialsDone = countTutorialsDone(tutorialMarks, tutorialSlugs);
+
+        const units = [
+          ...tracked.map(x => x.progress),
+          ...tutorialSlugs.map((s: string) =>
+            s && tutorialMarks[s]?.done ? 100 : 0,
+          ),
+        ];
+
         const avg =
-          tracked.length > 0
-            ? tracked.reduce((sum, x) => sum + x.progress, 0) / tracked.length
+          units.length > 0
+            ? units.reduce((sum, p) => sum + p, 0) / units.length
             : 0;
 
-        setOverallProgress(Math.round(avg));
-        setCompletedCount(done);
-        setTotalCount(tracked.length);
+        setOverallProgress(exactPercent(avg));
+        setCompletedCount(done + tutorialsDone);
+        setTotalCount(units.length);
         setCoursesInProgress(inFlight.length);
 
         setContinueItems(
@@ -221,11 +254,10 @@ export function useDashboardData(navigation: any): DashboardData {
         );
 
         /* ── Feed → "Fresh from Phil" rail ────────────────────────────────── */
-        const feed = toArray(feedRes?.data ?? feedRes);
-        setLockedCount(feed.filter((f: any) => f?.locked).length);
+        setLockedCount(feedAll.filter((f: any) => f?.locked).length);
 
         setFeedItems(
-          feed.slice(0, FEED_RAIL_COUNT).map((f: any) => ({
+          feedAll.slice(0, FEED_RAIL_COUNT).map((f: any) => ({
             id: f?.id,
             slug: f?.slug,
             title: f?.name ?? f?.headline ?? 'Untitled',

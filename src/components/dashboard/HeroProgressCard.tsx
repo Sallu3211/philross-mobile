@@ -13,6 +13,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { theme } from '../../theme';
+import { exactPercent } from '../../utils/percent';
 import ProgressRing from '../ui/ProgressRing';
 import StatusChip, { StatusTone } from '../ui/StatusChip';
 import { IconProps } from '../ui/icons';
@@ -81,7 +82,7 @@ export const HeroProgressCard: React.FC<HeroProgressCardProps> = ({
       strokeWidth={9}
       color={theme.color.progress.fillOnDark}
       trackColor={theme.color.progress.trackOnDark}
-      label={loading ? '—' : `${Math.round(progress)}%`}
+      label={loading ? '—' : `${exactPercent(progress)}%`}
       labelColor={theme.color.text.inverse}
       labelSize={24}
       caption="complete"

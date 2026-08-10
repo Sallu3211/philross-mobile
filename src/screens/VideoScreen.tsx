@@ -333,7 +333,7 @@ const VideoScreen = ({ route, navigation }: any) => {
             accessibilityLabel={done ? 'Marked as done' : 'Mark as done'}
           >
             <View style={[styles.doneTick, done && styles.doneTickOn]}>
-              {done && <Check size={12} color={theme.color.text.inverse} />}
+              {done && <Check size={12} color={theme.color.surface.hero} />}
             </View>
             <Text style={[styles.doneText, done && styles.doneTextOn]}>
               {done ? 'Completed' : 'Mark as done'}
@@ -502,42 +502,42 @@ const styles = StyleSheet.create({
     backgroundColor: theme.color.brand.base,
   },
 
+  /**
+   * Dark plate, matching the drawer masthead and the hero card. The action is
+   * the one commitment on this screen, so it earns the app's heaviest surface
+   * rather than looking like another outlined row.
+   */
   doneBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: theme.space.md,
-    minHeight: 48,
+    minHeight: 50,
     borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.color.border.default,
-    backgroundColor: theme.color.surface.card,
+    backgroundColor: theme.color.surface.hero,
     marginTop: theme.space.lg,
   },
-  doneBtnOn: {
-    borderColor: theme.color.status.success,
-    backgroundColor: theme.color.status.successSubtle,
-  },
+  doneBtnOn: { backgroundColor: theme.color.surface.heroRaised },
   /** Empty ring → filled tick. The shape carries the state, not the hue. */
   doneTick: {
     width: 20,
     height: 20,
     borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: theme.color.border.strong,
+    borderColor: 'rgba(255,255,255,0.45)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   doneTickOn: {
-    borderColor: theme.color.status.success,
-    backgroundColor: theme.color.status.success,
+    borderColor: theme.color.status.successOnDark,
+    backgroundColor: theme.color.status.successOnDark,
   },
   doneText: {
     fontFamily: theme.font.semibold,
     fontSize: theme.type.bodySm.fontSize,
-    color: theme.color.text.secondary,
+    color: theme.color.text.inverse,
   },
-  doneTextOn: { color: theme.color.status.success },
+  doneTextOn: { color: theme.color.status.successOnDark },
 
   tags: {
     flexDirection: 'row',

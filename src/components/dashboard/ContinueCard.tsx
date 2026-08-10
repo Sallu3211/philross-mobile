@@ -18,6 +18,7 @@ import {
   View,
 } from 'react-native';
 import { theme } from '../../theme';
+import { exactPercent } from '../../utils/percent';
 import LinearMeter from '../ui/LinearMeter';
 import { Lock, Play } from '../ui/icons';
 
@@ -82,7 +83,7 @@ export const ContinueCard: React.FC<ContinueCardProps> = ({
       onPress={() => onPress(item)}
       accessibilityRole="button"
       accessibilityLabel={`${item.title}. ${
-        item.locked ? 'Locked.' : `${Math.round(item.progress)} percent complete.`
+        item.locked ? 'Locked.' : `${exactPercent(item.progress)} percent complete.`
       }`}
     >
       <View style={[styles.thumbWrap, { height: thumbHeight }]}>

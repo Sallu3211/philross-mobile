@@ -9,6 +9,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { theme } from '../../theme';
+import { exactPercent } from '../../utils/percent';
 
 export interface LinearMeterProps {
   /** 0–100, clamped. */
@@ -73,7 +74,7 @@ export const LinearMeter: React.FC<LinearMeterProps> = ({
       </View>
       {showValue && (
         <Text style={[styles.value, { color: valueColor }]} allowFontScaling={false}>
-          {Math.round(clamped)}%
+          {exactPercent(clamped)}%
         </Text>
       )}
     </View>

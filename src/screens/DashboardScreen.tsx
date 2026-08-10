@@ -26,6 +26,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 
 import SideMenu from '../components/SideMenu';
 import { useUser } from '../context/UserContext';
@@ -91,6 +92,16 @@ const DashboardScreen = ({ navigation }: any) => {
       });
     },
     [navigation, d],
+  );
+
+  // Marking a tutorial done happens on another screen, so the counts here are
+  // stale by the time you come back. Re-read on focus.
+  useFocusEffect(
+    useCallback(() => {
+      d.refresh();
+      // Refreshing on every focus is the point; d changes each render.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []),
   );
 
   /** CourseDetails reads BOTH courseId and courseSlug from its route params. */

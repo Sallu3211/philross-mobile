@@ -13,6 +13,7 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import Svg, { Circle, G } from 'react-native-svg';
 import { theme } from '../../theme';
+import { exactPercent } from '../../utils/percent';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -120,7 +121,7 @@ export const ProgressRing: React.FC<ProgressRingProps> = ({
                 ]}
                 allowFontScaling={false}
               >
-                {label ?? `${Math.round(clamped)}%`}
+                {label ?? `${exactPercent(clamped)}%`}
               </Text>
             )}
             {!!caption && (
