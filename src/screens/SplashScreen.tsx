@@ -1,8 +1,6 @@
 import React, { useEffect } from 'react';
-import { View, StyleSheet, Dimensions, } from 'react-native';
+import { View, StyleSheet, } from 'react-native';
 import { useUser } from '../context/UserContext';
-
-const { width, height } = Dimensions.get('window');
 
 const SplashScreen = ({ navigation }: any) => {
   const { isLoggedIn, isLoading } = useUser();

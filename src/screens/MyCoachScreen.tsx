@@ -45,7 +45,7 @@ const MyCoachScreen = ({ navigation }: any) => {
       } else {
         setError('Failed to load coach information');
       }
-    } catch (error) {
+    } catch (e) {
       setError('Failed to load coach information');
     } finally {
       setIsLoading(false);
@@ -70,8 +70,8 @@ const MyCoachScreen = ({ navigation }: any) => {
         instructorName: coachData?.instructor_name,
       });
       
-    } catch (error) {
-      console.error('❌ Error starting intake form:', error);
+    } catch (e) {
+      console.error('Error starting intake form:', e);
       Alert.alert('Error', 'Something went wrong. Please try again.');
     }
   };

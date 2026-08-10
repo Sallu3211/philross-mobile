@@ -30,14 +30,11 @@ import {
   useColorScheme,
   Animated,
   ActivityIndicator,
-  Dimensions,
   Platform,
   StatusBar,
 } from 'react-native';
 import { NoInternetScreenProps } from '../types/network';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
-
-const { width, height } = Dimensions.get('window');
 
 /**
  * NoInternetScreen Component

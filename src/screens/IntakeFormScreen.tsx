@@ -1,1070 +1,482 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Platform,
-  TextInput,
-  Dimensions,
-  Alert,
   ActivityIndicator,
-  Clipboard,
-  ToastAndroid,
-  Linking,
-  Image,
+  Alert,
   KeyboardAvoidingView,
-  Share,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { Dropdown } from 'react-native-element-dropdown';
-import { getFontFamily, } from '../utils/platform';
-import ArrowLeftIcon from '../../assets/icons/arrow-left.svg';
-import ShareIcon from '../../assets/icons/Icon.svg';
-import DocumentCopyIcon from '../../assets/icons/document-copy.svg';
-import FbIcon from '../../assets/icons/facebook.png';
-import WhatsAppIcon from '../../assets/icons/whatsapp.png';
-import InstagramIcon from '../../assets/icons/instagram.png';
-import XIcon from '../../assets/icons/x_icon.png';
-import TelegramIcon from '../../assets/icons/telegram.png';
-import Utils from '../../app/helpers/Utilities';
-import share from '../../assets/icons/share.png';
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { getCoachList, submitIntakeForm } from '../../app/helpers/ApiHelper';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { theme } from '../theme';
+import ScreenHeader from '../components/ui/ScreenHeader';
+import { Check } from '../components/ui/icons';
+import { submitIntakeForm } from '../../app/helpers/ApiHelper';
 import { countryCodes, phoneLengthRules } from '../data/countryCodes';
 
-const { width, height } = Dimensions.get('window');
+const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const MODES = ['In-person', 'Virtual'];
 
-const IntakeFormScreen = ({ route, navigation }: any) => {
-  const [coachData, setCoachData] = useState<any>(null);
-  const [isLoadingCoaches, setIsLoadingCoaches] = useState(false);
+type Errors = Partial<
+  Record<'fitnessGoals' | 'availability' | 'city' | 'state' | 'phoneNumber', string>
+>;
+
+/** Longest matching dial code wins, so +1 does not shadow +12xx. */
+const detectCountryCode = (phone: string): string => {
+  const clean = phone.replace(/[^\d+]/g, '');
+  if (clean.startsWith('+')) {
+    const sorted = [...countryCodes].sort((a, b) => b.code.length - a.code.length);
+    for (const country of sorted) {
+      if (clean.startsWith(country.code)) return country.code;
+    }
+  }
+  return '+1';
+};
+
+const extractPhoneNumber = (phone: string): string => {
+  const code = detectCountryCode(phone);
+  const clean = phone.replace(/[^\d+]/g, '');
+  return clean.startsWith('+') ? clean.substring(code.length) : clean;
+};
+
+const validatePhoneNumber = (phone: string): boolean => {
+  const digits = extractPhoneNumber(phone);
+  const rules = phoneLengthRules[detectCountryCode(phone)];
+  if (!rules) return digits.length >= 7 && digits.length <= 15;
+  return digits.length >= rules.min && digits.length <= rules.max;
+};
+
+const IntakeFormScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
-  
-  const [formData, setFormData] = useState({
-    fitnessGoals: '',
-    availability: [] as string[],
-    location: { city: '', state: '' },
-    trainingPreference: 'In-person',
-    injuries: '',
-    additionalInfo: '',
-    phoneNumber: '',
-    selectedCoach: null as any,
-  });
+  const scrollRef = useRef<ScrollView>(null);
 
-  const [showShare, setShowShare] = useState(false);
+  const [fitnessGoals, setFitnessGoals] = useState('');
+  const [availability, setAvailability] = useState<string[]>([]);
+  const [city, setCity] = useState('');
+  const [state, setState] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [trainingPreference, setTrainingPreference] = useState('In-person');
+  const [injuries, setInjuries] = useState('');
+  const [additionalInfo, setAdditionalInfo] = useState('');
 
-  const scrollViewRef = useRef<any>(null);
-  const handleInputFocus = (event:any) => {
-    if (scrollViewRef?.current) {
-      scrollViewRef?.current?.scrollTo({
-        y: event.nativeEvent.target,
-        animated: true,
-      });
-    }
-  };
-
-  useEffect(() => {
-    fetchCoachData();
-  }, []);
-
-  const fetchCoachData = async () => {
-    try {
-      setIsLoadingCoaches(true);
-      const response = await getCoachList(navigation);
-      if (response?.status || response?.success) {
-        const coaches = response.data?.results || response.data || [];
-        if (coaches.length > 0) {
-          setCoachData(coaches);
-        }
-      }
-    } catch (error) {
-      console.log('fetchCoachData error >>> ', JSON.stringify(error))
-    } finally {
-      setIsLoadingCoaches(false);
-    }
-  };
-
-  const handleBack = () => {
-    navigation.goBack();
-  };
-
-  const handleShare = () => {
-    setShowShare(true);
-  };
-
-  const handleSocialShare = async (platform: string) => {
-    const androidAppUrl = 'https://play.google.com/store/apps/details?id=com.philross';
-    const iosAppUrl = 'https://apps.apple.com/us/app/philross/id6751194230';
-    const shareMessage = `Master Phil App – Train Smarter. Get Stronger.\nUnlock expert training, fitness routines & the BodyBell Method® – anytime, anywhere!\n\nDownload now:\nAndroid: ${androidAppUrl}\niOS: ${iosAppUrl}`;
-    let shareUrl = '';
-
-    switch (platform) {
-      case 'facebook':
-        shareUrl = `https://www.facebook.com/sharer/sharer.php?quote=${encodeURIComponent(shareMessage)}`;
-        break;
-      case 'whatsapp':
-        shareUrl = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
-        break;
-      case 'twitter':
-        shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareMessage)}`;
-        break;
-      case 'telegram':
-        shareUrl = `tg://msg?text=${encodeURIComponent(shareMessage)}`;
-        break;
-      case 'instagram':
-        try {
-          await Clipboard.setString(shareMessage);
-          if (Platform.OS === 'android') {
-            ToastAndroid.show('Message copied to clipboard', ToastAndroid.SHORT);
-          } else {
-            Alert.alert('Message Copied', 'Master Phil app message copied to clipboard.');
-          }
-        } catch (e) {
-          console.log('Copy failed:', e);
-        }
-        return;
-      default:
-        return;
-    }
-
-    if (shareUrl) {
-      try {
-        await Linking.openURL(shareUrl);
-      } catch (error) {
-        console.log('Failed to open URL:', error);
-        await Share.share({ message: shareMessage });
-      }
-    }
-  };
-
+  const [errors, setErrors] = useState<Errors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Function to detect country code from phone number
-  const detectCountryCode = (phoneNumber: string): string => {
-    // Remove all non-digit characters except +
-    const cleanPhone = phoneNumber.replace(/[^\d+]/g, '');
-    
-    // If phone starts with +, extract the country code
-    if (cleanPhone.startsWith('+')) {
-      // Find the longest matching country code
-      const sortedCodes = countryCodes.sort((a, b) => b.code.length - a.code.length);
-      
-      for (const country of sortedCodes) {
-        if (cleanPhone.startsWith(country.code)) {
-          return country.code;
-        }
-      }
-    }
-    
-    // If no country code detected, assume US (+1) as default
-    return '+1';
-  };
+  const clearError = (field: keyof Errors) =>
+    setErrors(prev => (prev[field] ? { ...prev, [field]: undefined } : prev));
 
-  // Function to extract phone number without country code
-  const extractPhoneNumber = (phoneNumber: string): string => {
-    const countryCode = detectCountryCode(phoneNumber);
-    const cleanPhone = phoneNumber.replace(/[^\d+]/g, '');
-    
-    if (cleanPhone.startsWith('+')) {
-      return cleanPhone.substring(countryCode.length);
-    }
-    
-    // If no + prefix, return the number as is
-    return cleanPhone;
-  };
-
-  // Country-specific phone number validation
-  const validatePhoneNumber = (phone: string): boolean => {
-    const countryCode = detectCountryCode(phone);
-    const cleanPhone = extractPhoneNumber(phone);
-    
-    const rules = phoneLengthRules[countryCode];
-    if (!rules) {
-      // If country code not found, use general international standard
-      return cleanPhone.length >= 7 && cleanPhone.length <= 15;
-    }
-    
-    return cleanPhone.length >= rules.min && cleanPhone.length <= rules.max;
+  const toggleDay = (day: string) => {
+    clearError('availability');
+    setAvailability(prev =>
+      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day],
+    );
   };
 
   const handleSubmit = async () => {
-    try {
-      // Validate required fields
-      if (!formData.fitnessGoals.trim()) {
-        Alert.alert('Error', 'Please enter your fitness goals');
-        return;
-      }
-      if (formData.availability.length === 0) {
-        Alert.alert('Error', 'Please select at least one available day');
-        return;
-      }
-      if (!formData.location.city.trim() || !formData.location.state.trim()) {
-        Alert.alert('Error', 'Please enter your city and state');
-        return;
-      }
-      if (!formData.phoneNumber.trim()) {
-        Alert.alert('Error', 'Please enter your phone number');
-        return;
-      }
-      if (!validatePhoneNumber(formData.phoneNumber)) {
-        const countryCode = detectCountryCode(formData.phoneNumber);
-        const cleanPhone = extractPhoneNumber(formData.phoneNumber);
-        Alert.alert('Error', `Please enter a valid phone number for ${countryCode}. Current length: ${cleanPhone.length} digits`);
-        return;
-      }
-      // if (!formData.selectedCoach) {
-      //   Alert.alert('Error', 'Please select a coach');
-      //   return;
-      // }
+    // Every problem at once, marked at the field. The old screen fired one
+    // Alert per rule, so a form with three gaps took three round-trips.
+    const next: Errors = {};
+    if (!fitnessGoals.trim()) next.fitnessGoals = 'Tell us what you are working towards.';
+    if (availability.length === 0) next.availability = 'Pick at least one day.';
+    if (!city.trim()) next.city = 'Required';
+    if (!state.trim()) next.state = 'Required';
+    if (!phoneNumber.trim()) {
+      next.phoneNumber = 'We need a number to reach you on.';
+    } else if (!validatePhoneNumber(phoneNumber)) {
+      const code = detectCountryCode(phoneNumber);
+      next.phoneNumber = `That does not look like a valid ${code} number.`;
+    }
 
+    if (Object.keys(next).length > 0) {
+      setErrors(next);
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
+      return;
+    }
+
+    try {
       setIsSubmitting(true);
 
-      // Prepare form data for API
-      const detectedCountryCode = detectCountryCode(formData.phoneNumber);
-      const cleanPhoneNumber = extractPhoneNumber(formData.phoneNumber);
-      
-      const apiFormData = {
-        // coach: formData.selectedCoach.id,
-        phone_number: `${detectedCountryCode}${cleanPhoneNumber}`,
-        training_days: formData.availability,
-        city: formData.location.city,
-        state: formData.location.state,
-        training_mode: formData.trainingPreference === 'In-person' ? 'in_person' : 'virtual',
-        additional_info: formData.additionalInfo || 'None',
-        medical_conditions: formData.injuries || 'None',
-        primary_fitness_goals: formData.fitnessGoals,
-      };
-
-      console.log('🚀 Submitting intake form with data:', apiFormData);
-
-      const response = await submitIntakeForm(apiFormData, navigation);
+      const response = await submitIntakeForm(
+        {
+          phone_number: `${detectCountryCode(phoneNumber)}${extractPhoneNumber(phoneNumber)}`,
+          training_days: availability,
+          city: city.trim(),
+          state: state.trim(),
+          training_mode:
+            trainingPreference === 'In-person' ? 'in_person' : 'virtual',
+          additional_info: additionalInfo || 'None',
+          medical_conditions: injuries || 'None',
+          primary_fitness_goals: fitnessGoals,
+        },
+        navigation,
+      );
 
       if (response?.status || response?.success) {
-        console.log('✅ Intake form submitted successfully');
-        Alert.alert(
-          'Success!',
-          'Your intake form has been submitted successfully. We will contact you soon.',
-          [
-            {
-              text: 'OK',
-              onPress: () => navigation.navigate('ApplicationConfirmation')
-            }
-          ]
-        );
+        // The confirmation screen says the same thing with more room, so
+        // there is no Alert in between.
+        navigation.replace('ApplicationConfirmation');
       } else {
-        console.log('❌ Intake form submission failed:', response);
-        Alert.alert('Error', response?.message || 'Failed to submit intake form. Please try again.');
+        Alert.alert(
+          'Not sent',
+          response?.message || 'We could not send your application. Please try again.',
+        );
       }
-
-    } catch (error) {
-      console.error('❌ Error submitting intake form:', error);
-      Alert.alert('Error', 'Something went wrong. Please try again.');
+    } catch (e) {
+      Alert.alert('Not sent', 'Something went wrong. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const updateFormData = (field: string, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  const toggleAvailability = (day: string) => {
-    setFormData(prev => ({
-      ...prev,
-      availability: prev.availability.includes(day) 
-        ? prev.availability.filter(d => d !== day)
-        : [...prev.availability, day]
-    }));
-  };
-
-  const updateLocation = (field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      location: {
-        ...prev.location,
-        [field]: value
-      }
-    }));
-  };
+  const field = (
+    n: number,
+    label: string,
+    node: React.ReactNode,
+    error?: string,
+    hint?: string,
+  ) => (
+    <View style={styles.field}>
+      <Text style={styles.label}>
+        <Text style={styles.num}>{n}. </Text>
+        {label}
+      </Text>
+      {!!hint && <Text style={styles.hint}>{hint}</Text>}
+      {node}
+      {!!error && <Text style={styles.error}>{error}</Text>}
+    </View>
+  );
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      {/* Top Navigation */}
-      <View style={styles.topNav}>
-        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-          <ArrowLeftIcon width={24} height={24} />
-        </TouchableOpacity>
-        <Text style={[styles.title, { fontFamily: getFontFamily('bold') }]}>
-          Intake Form
-        </Text>
-        <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
-          <ShareIcon width={24} height={24} />
-        </TouchableOpacity>
-      </View>
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <StatusBar barStyle="dark-content" backgroundColor={theme.color.surface.app} />
 
-      {/* Content */}
-      <ScrollView 
-        style={styles.content} 
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={styles.scrollContent}
-        bounces={false}
-        scrollEventThrottle={16}
+      <ScreenHeader title="Apply" onBack={() => navigation.goBack()} />
+
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={styles.formContainer}>
-          <Text style={[styles.formDescription, { fontFamily: getFontFamily('body') }]}>
-            Help us tailor your training. Your answers will guide Master Phil in creating your ultimate personalized plan.
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Text style={styles.intro}>
+            Help us tailor your training. Your answers guide Master Phil in
+            building your plan.
           </Text>
 
-          {/* Question 1: Fitness Goals */}
-          <View style={styles.questionContainer}>
-            <Text style={[styles.questionText, { fontFamily: getFontFamily('bold') }]}>
-              1. What are your primary fitness goals?
-            </Text>
+          {field(
+            1,
+            'What are your primary fitness goals?',
             <TextInput
-              style={[styles.textAreaInput, { fontFamily: getFontFamily('body') }]}
-              value={formData.fitnessGoals}
-              onChangeText={(text) => updateFormData('fitnessGoals', text)}
-              placeholder="(e.g., strength, weight loss, endurance, specific skill)"
-              placeholderTextColor="#999999"
+              style={[styles.input, styles.area, !!errors.fitnessGoals && styles.inputBad]}
+              value={fitnessGoals}
+              onChangeText={t => {
+                setFitnessGoals(t);
+                clearError('fitnessGoals');
+              }}
+              placeholder="Strength, weight loss, endurance, a specific skill…"
+              placeholderTextColor={theme.color.text.disabled}
               multiline
-              numberOfLines={6}
-              onFocus={handleInputFocus}
-            />
-          </View>
+              textAlignVertical="top"
+            />,
+            errors.fitnessGoals,
+          )}
 
-          {/* Question 2: Availability */}
-          <View style={styles.questionContainer}>
-            <Text style={[styles.questionText, { fontFamily: getFontFamily('bold') }]}>
-              2. What days and times are you typically available for training?
-            </Text>
-            <View style={styles.daysContainer}>
-              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
-                <TouchableOpacity
-                  key={day}
-                  style={[
-                    styles.dayButton,
-                    formData.availability.includes(day) && styles.dayButtonSelected
-                  ]}
-                  onPress={() => toggleAvailability(day)}
-                >
-                  <Text 
-                    style={[
-                      styles.dayButtonText,
-                      { fontFamily: getFontFamily('body') },
-                      formData.availability.includes(day) && styles.dayButtonTextSelected
-                    ]}
-                    numberOfLines={1}
+          {field(
+            2,
+            'Which days are you usually free to train?',
+            <View style={styles.days}>
+              {DAYS.map(day => {
+                const on = availability.includes(day);
+                return (
+                  <TouchableOpacity
+                    key={day}
+                    style={[styles.day, on && styles.dayOn]}
+                    onPress={() => toggleDay(day)}
+                    activeOpacity={0.8}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: on }}
                   >
-                    {day}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
+                    {/* Tick as well as fill — selection should not rest on
+                        colour alone. */}
+                    {on && <Check size={10} color={theme.color.text.onBrand} />}
+                    <Text
+                      style={[styles.dayText, on && styles.dayTextOn]}
+                      allowFontScaling={false}
+                    >
+                      {day}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>,
+            errors.availability,
+          )}
 
-          {/* Question 3: Location */}
-          <View style={styles.questionContainer}>
-            <Text style={[styles.questionText, { fontFamily: getFontFamily('bold') }]}>
-              3. Where are you located?
-            </Text>
-            <View style={styles.locationContainer}>
+          {field(
+            3,
+            'Where are you based?',
+            <View style={styles.row}>
               <TextInput
-                style={[styles.locationInput, { fontFamily: getFontFamily('body') }]}
-                value={formData.location.city}
-                onChangeText={(text) => updateLocation('city', text)}
+                style={[styles.input, styles.half, !!errors.city && styles.inputBad]}
+                value={city}
+                onChangeText={t => {
+                  setCity(t);
+                  clearError('city');
+                }}
                 placeholder="City"
-                placeholderTextColor="#999999"
-                onFocus={handleInputFocus}
+                placeholderTextColor={theme.color.text.disabled}
               />
               <TextInput
-                style={[styles.locationInput, { fontFamily: getFontFamily('body') }]}
-                value={formData.location.state}
-                onChangeText={(text) => updateLocation('state', text)}
+                style={[styles.input, styles.half, !!errors.state && styles.inputBad]}
+                value={state}
+                onChangeText={t => {
+                  setState(t);
+                  clearError('state');
+                }}
                 placeholder="State"
-                placeholderTextColor="#999999"
-                onFocus={handleInputFocus}
+                placeholderTextColor={theme.color.text.disabled}
               />
-            </View>
-          </View>
+            </View>,
+            errors.city || errors.state,
+          )}
 
-          {/* Question 4: Phone Number */}
-          <View style={styles.questionContainer}>
-            <Text style={[styles.questionText, { fontFamily: getFontFamily('bold') }]}>
-              4. What's your phone number?
-            </Text>
-            <Text style={[styles.phoneHelperText, { fontFamily: getFontFamily('body') }]}>
-              Include country code (e.g., +1 5551234567, +44 7700123456, +91 9876543210)
-            </Text>
+          {field(
+            4,
+            'What is your phone number?',
             <TextInput
-              style={[styles.phoneInputSingle, { fontFamily: getFontFamily('body') }]}
-              value={formData.phoneNumber}
-              onChangeText={(text) => updateFormData('phoneNumber', text)}
+              style={[styles.input, !!errors.phoneNumber && styles.inputBad]}
+              value={phoneNumber}
+              onChangeText={t => {
+                setPhoneNumber(t);
+                clearError('phoneNumber');
+              }}
               placeholder="+1 5551234567"
-              placeholderTextColor="#999999"
+              placeholderTextColor={theme.color.text.disabled}
               keyboardType="phone-pad"
               maxLength={20}
-              onFocus={handleInputFocus}
-            />
-          </View>
+            />,
+            errors.phoneNumber,
+            'Include your country code — +1, +44, +91 and so on.',
+          )}
 
-          {/* Question 5: Coach Selection */}
-          {/* <View style={styles.questionContainer}>
-            <Text style={[styles.questionText, { fontFamily: getFontFamily('bold') }]}>
-              5. Select your preferred coach
-            </Text>
-            {isLoadingCoaches ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color="#B62020" />
-                <Text style={[styles.loadingText, { fontFamily: getFontFamily('body') }]}>
-                  Loading coaches...
-                </Text>
-              </View>
-            ) : (
-              <Dropdown
-                style={styles.coachDropdown}
-                placeholderStyle={styles.dropdownPlaceholder}
-                selectedTextStyle={styles.dropdownSelectedText}
-                placeholder="Select Coach"
-                data={coachData || []}
-                maxHeight={300}
-                labelField="headline"
-                valueField="id"
-                value={formData.selectedCoach?.id}
-                onChange={item => updateFormData('selectedCoach', item)}
-                renderItem={(item) => (
-                  <View style={styles.coachDropdownItem}>
-                    <Image 
-                      source={{ uri: item.cropped_image_url }} 
-                      style={styles.coachImage}
-                    />
-                    <View style={styles.coachInfo}>
-                      <Text style={styles.coachName}>{item.headline}</Text>
-                      <Text style={styles.coachDescription} numberOfLines={2}>
-                        {item.description}
-                      </Text>
-                    </View>
-                  </View>
-                )}
-                renderLeftIcon={() => (
-                  formData.selectedCoach ? (
-                    <Image 
-                      source={{ uri: formData.selectedCoach.cropped_image_url }} 
-                      style={styles.selectedCoachImage}
-                    />
-                  ) : null
-                )}
-              />
-            )}
-          </View> */}
+          {field(
+            5,
+            'How do you prefer to train?',
+            <View style={styles.modes}>
+              {MODES.map(mode => {
+                const on = trainingPreference === mode;
+                return (
+                  <TouchableOpacity
+                    key={mode}
+                    style={[styles.mode, on && styles.modeOn]}
+                    onPress={() => setTrainingPreference(mode)}
+                    activeOpacity={0.8}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: on }}
+                  >
+                    {on && <Check size={12} color={theme.color.text.onBrand} />}
+                    <Text style={[styles.modeText, on && styles.modeTextOn]}>
+                      {mode}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>,
+          )}
 
-          {/* Question 6: Training Preference */}
-          <View style={styles.questionContainer}>
-            <Text style={[styles.questionText, { fontFamily: getFontFamily('bold') }]}>
-              5. How do you prefer to train?
-            </Text>
-            <View style={styles.trainingPreferenceContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.preferenceButton,
-                  formData.trainingPreference === 'In-person' && styles.preferenceButtonSelected
-                ]}
-                onPress={() => updateFormData('trainingPreference', 'In-person')}
-              >
-                <Text style={[
-                  styles.preferenceButtonText,
-                  { fontFamily: getFontFamily('body') },
-                  formData.trainingPreference === 'In-person' && styles.preferenceButtonTextSelected
-                ]}>
-                  In-person
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.preferenceButton,
-                  formData.trainingPreference === 'Virtual' && styles.preferenceButtonSelected
-                ]}
-                onPress={() => updateFormData('trainingPreference', 'Virtual')}
-              >
-                <Text style={[
-                  styles.preferenceButtonText,
-                  { fontFamily: getFontFamily('body') },
-                  formData.trainingPreference === 'Virtual' && styles.preferenceButtonTextSelected
-                ]}>
-                  Virtual
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Question 7: Injuries */}
-          <View style={styles.questionContainer}>
-            <Text style={[styles.questionText, { fontFamily: getFontFamily('bold') }]}>
-              6. Do you have any current or past injuries, or medical conditions we should be aware of?
-            </Text>
+          {field(
+            6,
+            'Any injuries or medical conditions we should know about?',
             <TextInput
-              style={[styles.textAreaInput, { fontFamily: getFontFamily('body') }]}
-              value={formData.injuries}
-              onChangeText={(text) => updateFormData('injuries', text)}
-              placeholder="(write injuries/conditions)"
-              placeholderTextColor="#999999"
+              style={[styles.input, styles.area]}
+              value={injuries}
+              onChangeText={setInjuries}
+              placeholder="Optional"
+              placeholderTextColor={theme.color.text.disabled}
               multiline
-              numberOfLines={5}
-              onFocus={handleInputFocus}
-            />
-          </View>
+              textAlignVertical="top"
+            />,
+          )}
 
-          {/* Question 8: Additional Info */}
-          <View style={styles.questionContainer}>
-            <Text style={[styles.questionText, { fontFamily: getFontFamily('bold') }]}>
-              7. Is there anything else you'd like us to know about your fitness journey?
-            </Text>
+          {field(
+            7,
+            'Anything else about your training so far?',
             <TextInput
-              style={[styles.textAreaInput, { fontFamily: getFontFamily('body') }]}
-              value={formData.additionalInfo}
-              onChangeText={(text) => updateFormData('additionalInfo', text)}
-              placeholder="(write additional info)"
-              placeholderTextColor="#999999"
+              style={[styles.input, styles.area]}
+              value={additionalInfo}
+              onChangeText={setAdditionalInfo}
+              placeholder="Optional"
+              placeholderTextColor={theme.color.text.disabled}
               multiline
-              numberOfLines={5}
-              onFocus={handleInputFocus}
-            />
-          </View>
+              textAlignVertical="top"
+            />,
+          )}
+        </ScrollView>
 
-          {/* Submit Button */}
-          <TouchableOpacity 
-            style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]} 
+        <View
+          style={[
+            styles.bar,
+            { paddingBottom: Math.max(insets.bottom, theme.space.lg) },
+          ]}
+        >
+          <TouchableOpacity
+            style={[styles.cta, isSubmitting && styles.ctaBusy]}
             onPress={handleSubmit}
             disabled={isSubmitting}
+            activeOpacity={0.9}
+            accessibilityRole="button"
           >
             {isSubmitting ? (
-              <ActivityIndicator color="#FFFFFF" size="small" />
+              <ActivityIndicator color={theme.color.text.onBrand} />
             ) : (
-              <Text style={[styles.submitButtonText, { fontFamily: getFontFamily('bold') }]}>
-                SUBMIT APPLICATION
-              </Text>
+              <Text style={styles.ctaText}>Send application</Text>
             )}
           </TouchableOpacity>
         </View>
-      </ScrollView>
-
-      {/* Share Modal */}
-      {showShare && (
-        <View style={styles.shareOverlay}>
-          <View style={[styles.shareModal, { paddingBottom: insets.bottom }]}>
-            <View style={styles.shareHeader}>
-              <TouchableOpacity onPress={() => setShowShare(false)}>
-                <Text style={styles.closeButton}>✕</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.shareContent}>
-              <View style={styles.shareIconContainer}>
-                <View style={styles.shareIcon}>
-                   <Image source={share} style={{ height: 40, width: 40 }} />
-                </View>
-              </View>
-              <Text style={[styles.shareTitle, { fontFamily: getFontFamily('bold') }]}>Share</Text>
-
-              <View style={styles.shareLinkSection}>
-                <View style={styles.contentContainer}>
-                  <Text style={[styles.contentText, { fontFamily: getFontFamily('bold') }]}>
-                    PhilRoss App – Train Smarter. Get Stronger.{'\n'}
-                    Unlock expert training, fitness routines & the BodyBell Method® – anytime, anywhere!
-                  </Text>
-                </View>
-                
-                <Text style={[styles.downloadTitle, { fontFamily: getFontFamily('bold') }]}>Download now:</Text>
-                <View style={styles.downloadSection}>
-                  <View style={styles.linkContainer}>
-                 
-                    <Text style={[styles.linkText, { fontFamily: getFontFamily('body') }]}>
-                    https://play.google.com/store/apps/details?id=com.philross
-                    </Text>
-                    <TouchableOpacity 
-                      style={styles.copyButton}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                      onPress={() => {
-                        const androidLink = 'https://play.google.com/store/apps/details?id=com.philross';
-                        try {
-                          Clipboard.setString(androidLink);
-                          if (Platform.OS === 'android') {
-                            ToastAndroid.show('Android link copied', ToastAndroid.SHORT);
-                          } else {
-                            Alert.alert('Link Copied', 'Android link copied to clipboard');
-                          }
-                        } catch (e) {
-                          console.log('Copy failed:', e);
-                          Alert.alert('Copy Failed', 'Unable to copy link, please try again.');
-                        }
-                      }}
-                    >
-                      <DocumentCopyIcon width={20} height={20} />
-                    </TouchableOpacity>
-                  </View>
-                  
-                  <View style={styles.linkContainer}>
-
-                    <Text style={[styles.linkText, { fontFamily: getFontFamily('body') }]}>
-                      https://apps.apple.com/us/app/philross/id6751194230
-                    </Text>
-                    <TouchableOpacity 
-                      style={styles.copyButton}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                      onPress={() => {
-                        const iosLink = 'https://apps.apple.com/us/app/philross/id6751194230';
-                        try {
-                          Clipboard.setString(iosLink);
-                          if (Platform.OS === 'android') {
-                            ToastAndroid.show('iOS link copied', ToastAndroid.SHORT);
-                          } else {
-                            Alert.alert('Link Copied', 'iOS link copied to clipboard');
-                          }
-                        } catch (e) {
-                          console.log('Copy failed:', e);
-                          Alert.alert('Copy Failed', 'Unable to copy link, please try again.');
-                        }
-                      }}
-                    >
-                      <DocumentCopyIcon width={20} height={20} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-
-              <View style={styles.shareToSection}>
-                <Text style={[styles.shareSectionTitle, { fontFamily: getFontFamily('bold') }]}>Share to</Text>
-                <View style={styles.socialButtons}>
-                  <TouchableOpacity style={styles.socialButton} onPress={() => handleSocialShare('facebook')}>
-                    <Image source={FbIcon} style={styles.socialIcons} resizeMode='contain' />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.socialButton} onPress={() => handleSocialShare('whatsapp')}>
-                    <Image source={WhatsAppIcon} style={styles.socialIcons} resizeMode='contain' />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.socialButton} onPress={() => handleSocialShare('instagram')}>
-                    <Image source={InstagramIcon} style={styles.socialIcons} resizeMode='contain' />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.socialButton} onPress={() => handleSocialShare('twitter')}>
-                   <Image source={XIcon} style={styles.socialIcons} resizeMode='contain' />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.socialButton} onPress={() => handleSocialShare('telegram')}>
-                    <Image source={TelegramIcon} style={styles.socialIcons} resizeMode='contain' />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          </View>
-        </View>
-      )}
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  topNav: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 70 : 50,
-    paddingBottom: 20,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-  },
-  shareButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'flex-end',
-  },
-  title: {
-    fontSize: 18,
-    fontFamily: getFontFamily('bold'),
-    color: '#000000',
-    flex: 1,
-    textAlign: 'center',
-  },
+  safe: { flex: 1, backgroundColor: theme.color.surface.app },
+  flex: { flex: 1 },
   content: {
-    flex: 1,
+    paddingHorizontal: theme.space.screen,
+    paddingBottom: theme.space['3xl'],
   },
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 100, // Extra padding at bottom for keyboard
-  },
-  formContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
-  formDescription: {
-    fontSize: 16,
-    color: '#000000',
-    lineHeight: 24,
-    marginBottom: 32,
-  },
-  questionContainer: {
-    marginBottom: 32,
-  },
-  questionText: {
-    fontSize: 16,
-    color: '#000000',
-    marginBottom: 16,
-    fontFamily: getFontFamily('bold'),
-  },
-  textAreaInput: {
-    backgroundColor: '#F8F8F8',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 14,
-    color: '#000000',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    textAlignVertical: 'top',
-    minHeight: 120,
-  },
-  daysContainer: {
-    flexDirection: 'row',
-    flexWrap: 'nowrap',
-    gap: 8,
-    justifyContent: 'center',
-  },
-  dayButton: {
-    backgroundColor: '#F8F8F8',
-    borderRadius: 8,
-    paddingHorizontal: 4,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    width: 47,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 40,
-  },
-  dayButtonSelected: {
-    backgroundColor: '#B62020',
-    borderColor: '#B62020',
-  },
-  dayButtonText: {
-    fontSize: 14,
-    color: '#666666',
-    textAlign: 'center',
-    lineHeight: 16,
-  },
-  dayButtonTextSelected: {
-    color: '#FFFFFF',
-  },
-  locationContainer: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  locationInput: {
-    flex: 1,
-    backgroundColor: '#F8F8F8',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    fontSize: 14,
-    color: '#000000',
-  },
-  locationDropdown: {
-    flex: 1,
-    backgroundColor: '#F8F8F8',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  dropdownText: {
-    fontSize: 14,
-    color: '#999999',
-  },
-  trainingPreferenceContainer: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  preferenceButton: {
-    backgroundColor: '#F8F8F8',
-    borderRadius: 8,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  preferenceButtonSelected: {
-    backgroundColor: '#B62020',
-    borderColor: '#B62020',
-  },
-  preferenceButtonText: {
-    fontSize: 14,
-    color: '#666666',
-  },
-  preferenceButtonTextSelected: {
-    color: '#FFFFFF',
-  },
-  submitButton: {
-    backgroundColor: '#B62020',
-    borderRadius: 30,
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginTop: 32,
-  },
-  submitButtonDisabled: {
-    backgroundColor: '#CCCCCC',
-  },
-  submitButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontFamily: getFontFamily('bold'),
-  },
-  shareOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    zIndex: 1000,
-  },
-  shareModal: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-    padding: 0, // Remove all padding
-    width: '100%',
-    // height: '100%', // Full screen height
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    // top: 250, // Moved up to provide more space at bottom
-  },
-  shareHeader: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    paddingTop: 10,
-    paddingRight: 20, // Add right padding for close button
-  },
-  closeButton: {
-    fontSize: 24,
-    color: '#000000',
-    fontFamily: getFontFamily('bold'),
-    padding: 5,
-  },
-  shareContent: {
-    alignItems: 'center',
-    paddingTop: 15,
-    paddingHorizontal: 20, // Add horizontal padding to content
-  },
-  shareIconContainer: {
-    marginBottom: 2,
-  },
-  shareIcon: {
-    width: 80,
-    height: 80,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#B62020',
-    borderRadius: 40,
-  },
-  shareTitle: {
-    fontSize: 24,
-    fontFamily: getFontFamily('bold'),
-    color: '#000000',
-    marginBottom: 30,
-  },
-  shareLinkSection: {
-    width: '100%',
-    marginBottom: 30,
-  },
-  shareSectionTitle: {
-    fontSize: 16,
-    fontFamily: getFontFamily('bold'),
-    color: '#000000',
-    marginBottom: 15,
-  },
-  contentContainer: {
-    marginBottom: 20,
-  },
-  contentText: {
-    fontSize: 14,
-    color: '#000000',
+
+  intro: {
+    fontFamily: theme.font.regular,
+    fontSize: theme.type.bodySm.fontSize,
     lineHeight: 20,
-    fontFamily: getFontFamily('bold'),
-    textAlign: 'center',
+    color: theme.color.text.secondary,
+    marginBottom: theme.space.xl,
   },
-  downloadTitle: {
-    fontSize: 16,
-    fontFamily: getFontFamily('bold'),
-    color: '#000000',
-    marginBottom: 20,
-    marginTop: -2,
+
+  field: { marginBottom: theme.space['2xl'] },
+  label: {
+    fontFamily: theme.font.semibold,
+    fontSize: theme.type.bodySm.fontSize,
+    lineHeight: 20,
+    color: theme.color.text.primary,
+    marginBottom: theme.space.sm,
   },
-  downloadSection: {
-    gap: 12,
-    marginBottom: 40,
-    marginTop: -10,
+  num: { color: theme.color.brand.base },
+  hint: {
+    fontFamily: theme.font.regular,
+    fontSize: theme.type.caption.fontSize,
+    lineHeight: 17,
+    color: theme.color.text.muted,
+    marginBottom: theme.space.sm,
   },
-  linkContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 8,
-    paddingHorizontal: 15,
-    paddingVertical: 12,
+  error: {
+    fontFamily: theme.font.medium,
+    fontSize: theme.type.caption.fontSize,
+    color: theme.color.brand.base,
+    marginTop: theme.space.xs,
   },
-  linkText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#666666',
-  },
-  copyButton: {
-    padding: 5,
-  },
-  shareToSection: {
-    width: '100%',
-    marginBottom: 10,
-  },
-  socialButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 0,
-  },
-  socialButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  // Phone number styles
-  phoneHelperText: {
-    fontSize: 12,
-    color: '#666666',
-    marginBottom: 8,
-    fontStyle: 'italic',
-  },
-  phoneInputSingle: {
-    backgroundColor: '#F8F8F8',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+
+  input: {
+    backgroundColor: theme.color.surface.card,
+    borderRadius: theme.radius.md,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
-    fontSize: 14,
-    color: '#000000',
+    borderColor: theme.color.border.subtle,
+    paddingHorizontal: theme.space.lg,
+    paddingVertical: theme.space.md,
+    minHeight: 48,
+    fontFamily: theme.font.regular,
+    fontSize: theme.type.bodySm.fontSize,
+    color: theme.color.text.primary,
   },
-  // Coach dropdown styles
-  coachDropdown: {
-    backgroundColor: '#F8F8F8',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+  inputBad: { borderColor: theme.color.brand.base },
+  area: { minHeight: 104, paddingTop: theme.space.md },
+
+  row: { flexDirection: 'row', gap: theme.space.md },
+  half: { flex: 1 },
+
+  days: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.space.sm },
+  day: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: theme.space.md,
+    minHeight: 38,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.color.surface.card,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: theme.color.border.subtle,
   },
-  coachDropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+  dayOn: {
+    backgroundColor: theme.color.brand.base,
+    borderColor: theme.color.brand.base,
   },
-  coachImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginRight: 12,
+  dayText: {
+    fontFamily: theme.font.medium,
+    fontSize: theme.type.caption.fontSize,
+    color: theme.color.text.secondary,
+    includeFontPadding: false,
   },
-  selectedCoachImage: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    marginRight: 8,
+  dayTextOn: {
+    fontFamily: theme.font.semibold,
+    color: theme.color.text.onBrand,
   },
-  coachInfo: {
+
+  modes: { flexDirection: 'row', gap: theme.space.md },
+  mode: {
     flex: 1,
-  },
-  coachName: {
-    fontSize: 16,
-    fontFamily: getFontFamily('bold'),
-    color: '#000000',
-    marginBottom: 4,
-  },
-  coachDescription: {
-    fontSize: 14,
-    color: '#666666',
-    lineHeight: 18,
-  },
-  // Dropdown styles
-  dropdownPlaceholder: {
-    fontSize: 14,
-    color: '#999999',
-  },
-  dropdownSelectedText: {
-    fontSize: 14,
-    color: '#000000',
-  },
-  dropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-  },
-  dropdownItemFlag: {
-    fontSize: 20,
-    marginRight: 8,
-  },
-  dropdownItemText: {
-    fontSize: 14,
-    color: '#000000',
-    marginRight: 8,
-    fontFamily: getFontFamily('body'),
-  },
-  dropdownItemCountry: {
-    fontSize: 12,
-    color: '#666666',
-  },
-  // Loading styles
-  loadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F8F8F8',
-    borderRadius: 12,
-    paddingVertical: 20,
-    paddingHorizontal: 16,
+    gap: theme.space.xs,
+    minHeight: 46,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.color.surface.card,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: theme.color.border.subtle,
   },
-  loadingText: {
-    marginLeft: 8,
-    fontSize: 14,
-    color: '#666666',
+  modeOn: {
+    backgroundColor: theme.color.brand.base,
+    borderColor: theme.color.brand.base,
   },
-  socialIcons: {
-    width: Utils.normalize(48),
-    height: Utils.normalize(48),
+  modeText: {
+    fontFamily: theme.font.medium,
+    fontSize: theme.type.bodySm.fontSize,
+    color: theme.color.text.secondary,
+  },
+  modeTextOn: {
+    fontFamily: theme.font.semibold,
+    color: theme.color.text.onBrand,
+  },
+
+  bar: {
+    paddingHorizontal: theme.space.screen,
+    paddingTop: theme.space.md,
+    backgroundColor: theme.color.surface.card,
+    borderTopWidth: 1,
+    borderTopColor: theme.color.border.subtle,
+  },
+  cta: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 52,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.color.brand.base,
+  },
+  ctaBusy: { opacity: 0.7 },
+  ctaText: {
+    fontFamily: theme.font.semibold,
+    fontSize: theme.type.h3.fontSize,
+    color: theme.color.text.onBrand,
   },
 });
 
