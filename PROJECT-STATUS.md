@@ -1,6 +1,6 @@
 # Master Phil / PhilRoss — Mobile App Project Status
 
-**Last updated:** 2026-08-06
+**Last updated:** 2026-08-10
 **Purpose:** Single reference for what this app is, where every piece lives, what has been done so far, and how to safely make the next client revision.
 
 ---
@@ -14,18 +14,19 @@
 | Local folder | `d:\arab projects code\master phil app` |
 | GitHub repo | https://github.com/Sallu3211/philross-mobile.git |
 | Default branch | `master` (⚠️ not `main`) |
+| Active work branch | `feat/dashboard-ui` — all UI work since 6 Aug lives here, **not yet merged to `master`** |
 | Repo owner account | `Sallu3211` |
 | Pushed via | `byterisellc` GitHub account (has write access) |
 | Commit author identity | `PhilRoss Dev <info@byterisellc.com>` |
 | Bundle ID / Package | `com.philross` (same on both platforms) |
 | Apple Team ID | `5YVZZNUTR7` |
-| Android version | `versionCode 25`, `versionName 1.4` |
-| iOS version | `MARKETING_VERSION 1.7`, build auto-incremented by CI |
+| Android version | `versionCode 26`, `versionName 1.5` |
+| iOS version | `MARKETING_VERSION 1.8`, build auto-incremented by CI |
 | Backend API | `https://api.philross.com/` |
 | Package manager | Yarn 1.22.10 (`yarn.lock` is authoritative) |
 | Node required | >= 18 (CI uses 20.19.0) |
 | CI/CD | Codemagic (`codemagic.yaml`) |
-| Sync status | Local and GitHub fully in sync at commit `652a64d`, clean tree |
+| Sync status | Local and GitHub in sync at `adf4ab8` on `feat/dashboard-ui`, clean tree |
 
 ---
 
@@ -35,6 +36,7 @@ A coaching / membership mobile app built around Master Phil's content and servic
 
 | Area | Screens |
 |---|---|
+| **Home** | Dashboard — greeting, progress, trial state, continue rail, explore grid, latest from the feed |
 | **Auth** | Login, Sign Up, Forgot Password, New Password — plus Google Sign-In and Apple Sign-In |
 | **Content feed** | Feed, Feed Details |
 | **Courses** | Courses list, Course Details |
@@ -42,10 +44,22 @@ A coaching / membership mobile app built around Master Phil's content and servic
 | **Events** | Events list, Event Details |
 | **Commerce** | Products, Product Details |
 | **Media** | Video screen with custom video player |
+| **Account** | Profile, Paywall |
 | **Marketing/Info** | About, Contact, Testimonials |
 | **System** | Splash screen, offline banner / no-internet screen |
 
-**Monetisation:** paywalls are driven by **Superwall**, and entitlements/purchases are handled by **RevenueCat**. The two are bridged by a custom purchase controller so Superwall knows the real subscription state.
+**Monetisation:** entitlements and purchases are handled by **RevenueCat**, against an **in-app paywall** (`src/screens/PaywallScreen.tsx`). Two products, both with a 7-day free trial:
+
+| Product ID | Price | Trial |
+|---|---|---|
+| `monthly_099` | $5.99 / month | 7 days |
+| `annual` | $59.99 / year | 7 days |
+
+The paywall reads products by **explicit ID** rather than through `getOfferings()`, because the RevenueCat Offering still points at a legacy `low` product. On Android it buys the *subscription option* carrying the free phase — buying the product directly skips the trial.
+
+⚠️ **The subscription unlocks feed tutorials only.** Courses are sold separately through external Stripe links ($199–$499). See §8 open item 1.
+
+**Superwall is disabled.** `Superwall.configure()` is commented out in `App.tsx`. Its dashboard campaign fired on implicit placements, so removing the SDK *call* was not enough — the whole SDK had to be switched off. `RCPurchaseController.tsx` and `MySuperwallDelegate.tsx` remain in the tree but are inert.
 
 ---
 
@@ -62,11 +76,19 @@ master phil app/
 ├── package.json                ← dependencies, scripts, patch-package postinstall
 │
 ├── src/
-│   ├── screens/                ← all 21 app screens (see feature table above)
+│   ├── theme/index.ts          ← ⭐ colour, type, spacing, radius tokens.
+│   │                             Every screen resolves through this.
+│   ├── screens/                ← all 24 app screens (see feature table above)
 │   ├── navigation/
-│   │   └── AppNavigator.tsx    ← ⭐ single source of truth for routing
-│   ├── components/             ← FeedCard, Loader, SideMenu, VideoPlayer,
-│   │                             NoInternetBanner, NoInternetScreen
+│   │   ├── AppNavigator.tsx    ← ⭐ single source of truth for routing
+│   │   └── navigationRef.ts    ← lets services navigate without importing App
+│   ├── components/
+│   │   ├── ui/                 ← ⭐ shared kit: ScreenHeader, SearchBar,
+│   │   │                         FilterChips, StateView, MediaListCard,
+│   │   │                         ProgressRing, LinearMeter, StatusChip, icons
+│   │   ├── SideMenu.tsx        ← the drawer; SOCIAL_LINKS map lives here
+│   │   ├── VideoPlayer.tsx     ← VideoPlayerNew (course player)
+│   │   └── NoInternetBanner / NoInternetScreen
 │   ├── context/
 │   │   ├── UserContext.tsx     ← ⭐ logged-in user state
 │   │   └── NetworkProvider.tsx ← connectivity state
@@ -229,7 +251,62 @@ react-native-share+12.1.2
 | `package.json` | 3 |
 | `src/` (app features) | 2 |
 
-**Read this honestly:** ~90% of the work so far has been **build, signing and release infrastructure**, not product features. The pipeline is now green and shipping to TestFlight automatically, so future effort can go into the app itself.
+**Read this honestly:** ~90% of the work in phases 1–6 was **build, signing and release infrastructure**, not product features. The pipeline went green and started shipping to TestFlight automatically, which is what freed up phases 7–11 below.
+
+### Phase 7 — Security (6 Aug)
+| Commit | What |
+|---|---|
+| `4cef89f` | 🔴 **Removed an obfuscated ~5KB payload from `react-native.config.js`** |
+
+> It had been present since the very first commit (`4cf0cd5`) and therefore ran on every developer machine and every Codemagic build since day one. Credentials that were exposed to build machines during that window should be treated as compromised and rotated.
+
+### Phase 8 — Dashboard, payments, auth (6–7 Aug)
+| Commit | What |
+|---|---|
+| `d4032c7` | Dashboard replaces the feed as the home screen; profile screen added |
+| `162d11a` | 🔴 **Superwall's hosted paywall replaced with an in-app one** |
+| `634e72f` | Auth screens redesigned; dashboard progress no longer reads 100% |
+| `a4995b3` | Montserrat registered with the iOS project |
+| `14ad24a` | Profile save fixed; paywall presented as a screen, not a modal |
+
+> Two real bugs behind these. The dashboard read `course_completed`, which the API returns as a **percentage string** (`"0 %"`), as a boolean — any non-empty string is truthy, so everything showed 100%. And profile save posted `first_name`/`last_name` when the API only accepts a single `full_name`.
+>
+> Superwall was removed rather than reconfigured: its campaign fired on *implicit* placements, so deleting the SDK call was not enough to stop it appearing. `Superwall.configure()` is now disabled entirely and `PaywallScreen` reads products by explicit ID.
+
+### Phase 9 — Store setup & local builds (7–8 Aug)
+| Commit | What |
+|---|---|
+| `cbeb50c` | Android release workflow made runnable; bumped to 26 (1.5) |
+| `5fdf048` | iOS build-number increment fixed; bumped to 1.8 |
+
+> Play Console and App Store Connect both now carry `monthly_099` ($5.99) and `annual` ($59.99) with **7-day free trials**. On Android the trial only applies if the app buys the *subscription option* carrying the free phase — buying the product directly skips it.
+>
+> The dev loop also moved off CI. Builds run locally over USB; Codemagic is for releases.
+
+### Phase 10 — Side menu & design system (8 Aug)
+| Commit | What |
+|---|---|
+| `2b7eb44` | Side menu rebuilt; one hamburger across every screen |
+| `a0fc892` | ⭐ **Shared UI kit added** (`src/components/ui/`); Courses rebuilt on it |
+
+### Phase 11 — Full screen revamp (8–10 Aug)
+| Commit | What |
+|---|---|
+| `a75b5db`, `f2da21a` | Products (one column, artwork no longer cropped), Events, Feed |
+| `2e29aba` | Testimonials — and **removal of fabricated fallback testimonials** |
+| `789ff13` | About, My Coach |
+| `f1d1116` | Contact, Product details |
+| `2366491` | Feed details, Event details |
+| `fe3d452` | Course details |
+| `dd75d3e` | Coach details, Video, Application confirmation |
+| `adf4ab8` | Intake form; dead video player retired |
+
+**Crashes fixed along the way**, all of which predate this work:
+- `ProductDetailsScreen` called `<ShareIcon>` in its header without importing it — the screen died on open.
+- `src/types/course` was imported by `VideoPlayer` but had never been committed, breaking types for everything that touched the player. The component needing it turned out to be dead; both are now gone.
+- Testimonials shipped hard-coded fake reviews ("Sarah J.", "David M.") using the Apple and Google logos as avatars, shown whenever the API returned nothing.
+
+Every screen in `src/` now resolves through `src/theme` and the shared `ui/` kit. The old `getFontFamily` / `getColors` helpers have no remaining callers.
 
 ---
 
@@ -237,17 +314,33 @@ react-native-share+12.1.2
 
 ✅ **Working**
 - iOS builds automatically on push to `master` and lands in TestFlight with no manual steps
-- Android release `.aab` builds successfully in CI
+- Android release `.aab` builds successfully, locally and in CI
 - Privacy Policy and Terms of Use pages published for store review
-- Superwall + RevenueCat paywall/entitlement flow wired end-to-end
+- RevenueCat entitlement flow with an **in-app** paywall on the real products, 7-day trial on both
+- Every screen on one design system: Montserrat, brand tokens, shared header / search / filter / state components
+- `tsc --noEmit` clean across `src/` apart from the two payment-code errors listed below
 
 🔴 **Open items**
-1. **Splash logo is blank.** Commit `41b64b5` removed the logo as a stopgap for the Android 12+ crop/zoom bug. The app currently launches to an empty splash. *This is the highest-visibility unfinished item for the client.*
-2. **Android Play Store upload is manual.** The `google_play:` block in `codemagic.yaml` is commented out; needs a Play Console service-account JSON wired in as a Codemagic integration.
-3. **Version numbers have drifted apart.** Android is at `1.4 (25)`, iOS at `1.7`. Worth reconciling to one marketing version before the next client-facing release.
-4. **`safe-area-context` patch version mismatch.** The patch targets 5.5.2 while `package.json` requests `^5.6.0` — a clean `yarn install` may fail to apply it.
-5. **`README.md` is still the default React Native boilerplate** — no project-specific setup instructions.
-6. **Dev API config has a hardcoded LAN IP** (`10.190.211.97` in `app/config/apiConfig.js`) that must be updated whenever the dev machine's Wi-Fi address changes. Production is unaffected.
+
+*Product decisions — need the client*
+1. **The paywall over-promises.** Its copy says "Every structured training programme", but the subscription unlocks **feed tutorials only** — courses are sold separately through external Stripe links at $199–$499. Either the copy narrows or courses come inside the subscription. This is a commercial decision, not a code one.
+2. **Applications do not say which programme they are for.** `IntakeFormScreen` receives `coachId` on the route but the payload's `coach` field was commented out before this work. Adding it back is a backend question — confirm the API accepts it first.
+
+*Backend gaps*
+3. **No progress endpoint.** Course and video progress is written to `EncryptedStorage` on the device and posted to `updateVideoProgress`, but there is no GET, so the dashboard rings read 0 until a real endpoint exists. Progress also does not survive a reinstall or move to a second device.
+4. **The backend knows nothing about subscriptions.** Entitlement lives entirely in RevenueCat. If the server ever needs to gate content, it needs a RevenueCat webhook.
+
+*Housekeeping*
+5. **Splash logo is blank.** Commit `41b64b5` removed the logo as a stopgap for the Android 12+ crop/zoom bug. Note that every current logo asset bakes in a black background with **no alpha channel**, which is why the side-menu masthead sits on pure black — a transparent PNG would fix both.
+6. **Two pre-existing type errors in payment code.** `RCPurchaseController` passes `automaticDeviceIdentifierCollectionEnabled`, which the RevenueCat SDK does not declare, and `subscriptionService` reads `subscriberAttributes` off `CustomerInfo`, where it does not exist. Both are no-ops at runtime; neither was touched by the UI work.
+7. **Android Play Store upload is manual.** The `google_play:` block in `codemagic.yaml` is commented out; needs a Play Console service-account JSON wired in as a Codemagic integration.
+8. **Keystore passwords are in `android/app/build.gradle`** in plain text. They belong in `gradle.properties` outside the repo, or in Codemagic environment variables.
+9. **`yarn.lock` is not committed**, so builds are not reproducible.
+10. **`safe-area-context` patch version mismatch.** The patch targets 5.5.2 while `package.json` requests `^5.6.0` — a clean `yarn install` may fail to apply it.
+11. **`README.md` is still the default React Native boilerplate.**
+12. **Dev API config has a hardcoded LAN IP** (`10.190.211.97` in `app/config/apiConfig.js`) that must be updated whenever the dev machine's Wi-Fi address changes. Production is unaffected.
+
+> ⚠️ **Rotate credentials exposed to build machines.** See Phase 7 — the obfuscated payload ran on Codemagic from the first commit until 6 Aug.
 
 ---
 
@@ -285,9 +378,13 @@ There is no staging branch. Any push to `master` starts an iOS build that auto-p
 | Client asks for… | Go to |
 |---|---|
 | New screen / changed navigation | `src/navigation/AppNavigator.tsx` + `src/screens/` |
-| Text, colours, shared constants | `app/config/constants.js` |
+| **Any colour, font size or spacing** | `src/theme/index.ts` — change it once, it changes everywhere |
+| A header, search box, filter row, empty/error state | `src/components/ui/` — do not hand-roll another one |
+| A new icon | `src/components/ui/icons.tsx` — solid fill, 24px grid, one path |
+| Menu items or social links | `src/components/SideMenu.tsx` (`SOCIAL_LINKS` map) |
+| Text, shared constants | `app/config/constants.js` |
 | API endpoint or timeout change | `app/config/apiConfig.js`, `src/network/index.ts` |
-| Paywall / pricing / entitlement behaviour | `src/services/subscriptionService.ts`, Superwall dashboard |
+| Paywall copy, pricing, entitlement behaviour | `src/screens/PaywallScreen.tsx`, `src/services/subscriptionService.ts`, RevenueCat dashboard |
 | Purchase or restore logic | `RCPurchaseController.tsx` |
 | Logo, icons, splash art | `assets/icons/`, `assets/bootsplash/`, plus native folders |
 | Privacy policy / terms wording | `docs/privacy-policy.html`, `docs/terms-of-use.html` |
