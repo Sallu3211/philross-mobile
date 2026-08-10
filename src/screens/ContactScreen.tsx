@@ -24,11 +24,16 @@ import FacebookLogo from '../../assets/icons/facebook.png';
 import WhatsappLogo from '../../assets/icons/whatsapp.png';
 import TelegramLogo from '../../assets/icons/telegram.png';
 import XLogo from '../../assets/icons/x_icon.png';
-import YouTubeMark from '../../assets/icons/mdi_youtube.svg';
-import TikTokMark from '../../assets/icons/ic_baseline-tiktok.svg';
-import LinkedInMark from '../../assets/icons/akar-icons_linkedin-fill.svg';
+import {
+  LinkedInRound,
+  TikTokRound,
+  YouTubeRound,
+} from '../components/ui/brandMarks';
 
 /** Shown only until the API answers; also the fallback if it never does. */
+/** One size for every social mark — PNG badge or drawn disc alike. */
+const SOCIAL_SIZE = 26;
+
 const FALLBACK_PHONE = '(551) 364-2545';
 const FALLBACK_EMAIL = 'info@philross.com';
 
@@ -36,17 +41,17 @@ interface Social {
   key: string;
   label: string;
   /** Marks that ship as SVG can be tinted; the rest are multi-colour PNGs. */
-  Svg?: React.FC<any>;
+  Svg?: React.FC<{ size?: number }>;
   color?: string;
   png?: number;
 }
 
 const SOCIALS: Social[] = [
-  { key: 'youtube', label: 'YouTube', Svg: YouTubeMark, color: '#FF0000' },
+  { key: 'youtube', label: 'YouTube', Svg: YouTubeRound },
   { key: 'instagram', label: 'Instagram', png: InstagramLogo },
   { key: 'facebook', label: 'Facebook', png: FacebookLogo },
-  { key: 'tiktok', label: 'TikTok', Svg: TikTokMark, color: '#000000' },
-  { key: 'linkedin', label: 'LinkedIn', Svg: LinkedInMark, color: '#0A66C2' },
+  { key: 'tiktok', label: 'TikTok', Svg: TikTokRound },
+  { key: 'linkedin', label: 'LinkedIn', Svg: LinkedInRound },
   { key: 'x', label: 'X', png: XLogo },
   { key: 'whatsapp', label: 'WhatsApp', png: WhatsappLogo },
   { key: 'telegram', label: 'Telegram', png: TelegramLogo },
@@ -203,7 +208,7 @@ const ContactScreen = ({ navigation }: any) => {
                     accessibilityLabel={s.label}
                   >
                     {s.Svg ? (
-                      <s.Svg width={22} height={22} fill={s.color} />
+                      <s.Svg size={SOCIAL_SIZE} />
                     ) : (
                       <Image
                         source={s.png}
@@ -334,7 +339,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: theme.color.border.subtle,
   },
-  socialImg: { width: 22, height: 22 },
+  socialImg: { width: SOCIAL_SIZE, height: SOCIAL_SIZE },
   socialLabel: {
     flex: 1,
     fontFamily: theme.font.medium,

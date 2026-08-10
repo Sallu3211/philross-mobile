@@ -4,7 +4,6 @@ import {
   Alert,
   Image,
   KeyboardAvoidingView,
-  Linking,
   Platform,
   ScrollView,
   StatusBar,
@@ -59,13 +58,11 @@ const SignUpScreen = ({ navigation }: any) => {
     setAgreeToTerms(false);
   };
 
-  const openTermsOfService = () => {
-    Linking.openURL('https://philross.com/privacy-policy-terms-of-use');
-  };
+  // Both open in-app rather than in a browser — sending someone out of the
+  // signup form to read the terms is how you lose them mid-signup.
+  const openTermsOfService = () => navigation.navigate('Legal', { doc: 'terms' });
 
-  const openPrivacyPolicy = () => {
-    Linking.openURL('https://philross.com/privacy-policy-terms-of-use');
-  };
+  const openPrivacyPolicy = () => navigation.navigate('Legal', { doc: 'privacy' });
 
   const handleSignUp = async () => {
     // Clear previous field errors

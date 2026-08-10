@@ -50,7 +50,10 @@ export const get = async (api: AxiosInstance, url: string, params?: object) => {
         return { 
             success: false, 
             message: errorMessage,
-            fieldErrors: error?.response?.data?.message || null // Pass field errors for UI highlighting
+            fieldErrors: error?.response?.data?.message || null, // Pass field errors for UI highlighting
+            // Callers need to tell "the server said no" from "there is no such
+            // endpoint" — a 404 is a missing API, not a user mistake.
+            httpStatus: error?.response?.status ?? null
         };
     }
 };
@@ -88,7 +91,10 @@ export const put = async (api: AxiosInstance, url: string, data: object) => {
         return { 
             success: false, 
             message: errorMessage,
-            fieldErrors: error?.response?.data?.message || null // Pass field errors for UI highlighting
+            fieldErrors: error?.response?.data?.message || null, // Pass field errors for UI highlighting
+            // Callers need to tell "the server said no" from "there is no such
+            // endpoint" — a 404 is a missing API, not a user mistake.
+            httpStatus: error?.response?.status ?? null
         };
     }
 };
@@ -126,7 +132,10 @@ export const post = async (api: AxiosInstance, url: string, data: object,) => {
         return { 
             success: false, 
             message: errorMessage,
-            fieldErrors: error?.response?.data?.message || null // Pass field errors for UI highlighting
+            fieldErrors: error?.response?.data?.message || null, // Pass field errors for UI highlighting
+            // Callers need to tell "the server said no" from "there is no such
+            // endpoint" — a 404 is a missing API, not a user mistake.
+            httpStatus: error?.response?.status ?? null
         };
     }
 };
@@ -164,7 +173,10 @@ export const patch = async (api: AxiosInstance, url: string, data: object) => {
         return { 
             success: false, 
             message: errorMessage,
-            fieldErrors: error?.response?.data?.message || null // Pass field errors for UI highlighting
+            fieldErrors: error?.response?.data?.message || null, // Pass field errors for UI highlighting
+            // Callers need to tell "the server said no" from "there is no such
+            // endpoint" — a 404 is a missing API, not a user mistake.
+            httpStatus: error?.response?.status ?? null
         };
     }
 };
@@ -202,7 +214,10 @@ export const del = async (api: AxiosInstance, url: string, params?: object) => {
         return { 
             success: false, 
             message: errorMessage,
-            fieldErrors: error?.response?.data?.message || null // Pass field errors for UI highlighting
+            fieldErrors: error?.response?.data?.message || null, // Pass field errors for UI highlighting
+            // Callers need to tell "the server said no" from "there is no such
+            // endpoint" — a 404 is a missing API, not a user mistake.
+            httpStatus: error?.response?.status ?? null
         };
     }
 };
@@ -1128,6 +1143,21 @@ export const updateProfile = async (
     try {
         const patched: any = await attempt('PATCH');
         if (ok(patched)) return patched;
+
+        // A 404 means the route does not exist, so retrying with another verb
+        // on the same URL cannot help. As of Aug 2026 the API serves no profile
+        // endpoint at all — `accounts/` exposes only signup, login, verify-otp,
+        // token/refresh, social-auth-login, forgot-password/* and
+        // delete-account. Say so plainly instead of "Request failed", which
+        // reads like the user typed something wrong.
+        if (patched?.httpStatus === 404) {
+            return {
+                success: false,
+                message:
+                    'Changing your name is not supported by the server yet. ' +
+                    'Please contact support.',
+            };
+        }
 
         console.log('updateProfile: PATCH rejected, retrying as PUT', patched);
         const put: any = await attempt('PUT');

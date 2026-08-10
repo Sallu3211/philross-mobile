@@ -628,15 +628,15 @@ const styles = StyleSheet.create({
     marginTop: theme.space.xl,
   },
   social: { alignItems: 'center', gap: theme.space.xs, width: 58 },
+  /** No plate behind the mark — each brand logo is already a finished
+      circular shape, and a grey disc under it drew a competing outline. */
   socialDisc: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.color.surface.sunken,
   },
-  socialImg: { width: 24, height: 24 },
+  socialImg: { width: 40, height: 40 },
   socialLabel: {
     fontFamily: theme.font.regular,
     fontSize: theme.type.caption.fontSize,

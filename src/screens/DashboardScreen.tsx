@@ -104,14 +104,23 @@ const DashboardScreen = ({ navigation }: any) => {
     [navigation],
   );
 
-  /** FeedDetails routes by `feedSlug`, not by id. */
+  /**
+   * Same split as the Tutorials list: a video opens the player, everything
+   * else opens the article. Sending both to FeedDetails made a tutorial in
+   * "Fresh from Phil" open as an article with no way to watch it.
+   */
   const openFeedItem = useCallback(
     (item: ContinueItem) => {
       const go = () =>
-        navigation.navigate('FeedDetails', {
-          feedSlug: item.slug,
-          sourceScreen: 'Dashboard',
-        });
+        item.source?.feed_type === 'video'
+          ? navigation.navigate('Video', {
+              videoData: item.source,
+              sourceScreen: 'Dashboard',
+            })
+          : navigation.navigate('FeedDetails', {
+              feedSlug: item.slug,
+              sourceScreen: 'Dashboard',
+            });
       if (item.locked) {
         openPaywall(go);
         return;

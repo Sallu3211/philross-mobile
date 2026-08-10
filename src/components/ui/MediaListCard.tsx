@@ -152,6 +152,9 @@ export const MediaListCard: React.FC<MediaListCardProps> = ({
 const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
+    alignItems: 'stretch',
+    // Floor so a one-line row still looks like a card, not a strip.
+    minHeight: 106,
     backgroundColor: theme.color.surface.card,
     borderRadius: 16,
     overflow: 'hidden',
@@ -166,7 +169,17 @@ const styles = StyleSheet.create({
     backgroundColor: theme.color.neutral[0],
     padding: theme.space.sm,
   },
-  thumb: { width: '100%', height: '100%' },
+  /**
+   * `flex: 1`, never a percentage height.
+   *
+   * The wrap has a width but no height — it is stretched to whatever the text
+   * column needs. An Image sized `height: '100%'` against an unresolved parent
+   * height falls back to the file's own dimensions, so a portrait video still
+   * pushed the wrap to its full pixel height and dragged the whole card with
+   * it: one tutorial filled the screen. Flex makes the image fill the row it
+   * is given and contribute no height of its own.
+   */
+  thumb: { flex: 1, alignSelf: 'stretch' },
   thumbEmpty: { backgroundColor: theme.color.neutral[200] },
   scrim: {
     ...StyleSheet.absoluteFillObject,

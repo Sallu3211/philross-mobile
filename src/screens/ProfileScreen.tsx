@@ -10,7 +10,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Linking,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -27,7 +26,6 @@ import EncryptedStorage from 'react-native-encrypted-storage';
 
 import { useUser } from '../context/UserContext';
 import { theme } from '../theme';
-import { Constants } from '../../app/config/constants';
 import {
   deleteAccount,
   getProfile,
@@ -188,14 +186,6 @@ const ProfileScreen = ({ navigation }: any) => {
     );
   }, [logout, navigation]);
 
-  const openLink = useCallback(async (url: string) => {
-    try {
-      await Linking.openURL(url);
-    } catch {
-      Alert.alert('Could not open link', url);
-    }
-  }, []);
-
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor={theme.color.surface.app} />
@@ -322,13 +312,13 @@ const ProfileScreen = ({ navigation }: any) => {
             icon={Info}
             label="Privacy policy"
             tint={theme.color.neutral[600]}
-            onPress={() => openLink(Constants.privacyPolicyUrl)}
+            onPress={() => navigation.navigate('Legal', { doc: 'privacy' })}
           />
           <Row
             icon={Info}
             label="Terms of use"
             tint={theme.color.neutral[600]}
-            onPress={() => openLink(Constants.termsOfUseUrl)}
+            onPress={() => navigation.navigate('Legal', { doc: 'terms' })}
           />
         </View>
 

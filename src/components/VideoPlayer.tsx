@@ -131,8 +131,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: theme.color.brand.base,
-    // The play triangle's optical centre sits left of its box.
-    paddingLeft: 3,
   },
 });
 

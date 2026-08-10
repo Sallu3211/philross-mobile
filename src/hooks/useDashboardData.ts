@@ -233,6 +233,7 @@ export function useDashboardData(navigation: any): DashboardData {
             progress: 0,
             imageUrl: artworkOf(f),
             locked: !!f?.locked,
+            source: f,
           })),
         );
       } catch (e: any) {

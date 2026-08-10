@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -23,7 +23,12 @@ import Orientation from 'react-native-orientation-locker';
 import { theme } from '../theme';
 import ScreenHeader from '../components/ui/ScreenHeader';
 import { ErrorState, LoadingState } from '../components/ui/StateView';
-import { Close, Copy, Play, Share } from '../components/ui/icons';
+import { Check, Close, Copy, Play, Share } from '../components/ui/icons';
+import {
+  AUTO_COMPLETE_AT,
+  isDone as readDone,
+  setDone as writeDone,
+} from '../services/tutorialProgress';
 import { getFeedItem } from '../../app/helpers/ApiHelper';
 import { pushCleverTapEvent } from '../../App';
 import FbIcon from '../../assets/icons/facebook.png';
@@ -67,6 +72,8 @@ interface PlayerProps {
   videoUrl: string;
   thumbnailUrl?: string;
   title: string;
+  /** Fires once playback passes the auto-complete threshold. */
+  onWatched?: () => void;
 }
 
 /**
@@ -77,9 +84,12 @@ const FeedVideoPlayer: React.FC<PlayerProps> = ({
   videoUrl,
   thumbnailUrl,
   title,
+  onWatched,
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isBuffering, setIsBuffering] = useState(false);
+  /** Guards onWatched — onProgress fires several times a second. */
+  const reportedWatched = useRef(false);
 
   useEffect(() => {
     pushCleverTapEvent('video_viewed', { videoType: 'feed_video', name: title });
@@ -108,6 +118,14 @@ const FeedVideoPlayer: React.FC<PlayerProps> = ({
             onLoadStart={() => setIsBuffering(true)}
             onLoad={() => setIsBuffering(false)}
             onBuffer={({ isBuffering: b }) => setIsBuffering(b)}
+            onProgress={data => {
+              const total = data.seekableDuration;
+              if (!total || reportedWatched.current) return;
+              if ((data.currentTime / total) * 100 >= AUTO_COMPLETE_AT) {
+                reportedWatched.current = true;
+                onWatched?.();
+              }
+            }}
             controlsStyles={{
               hideNext: true,
               hidePrevious: true,
@@ -152,11 +170,36 @@ const VideoScreen = ({ route, navigation }: any) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showShare, setShowShare] = useState(false);
+  const [done, setDoneState] = useState(false);
+
+  const slug: string | undefined = videoDetails?.slug ?? videoData?.slug;
 
   useEffect(() => {
     Orientation.unlockAllOrientations();
     return () => Orientation.lockToPortrait();
   }, []);
+
+  useEffect(() => {
+    let alive = true;
+    readDone(slug).then(v => alive && setDoneState(v));
+    return () => {
+      alive = false;
+    };
+  }, [slug]);
+
+  const toggleDone = useCallback(async () => {
+    if (!slug) return;
+    const next = !done;
+    setDoneState(next); // Optimistic: the write is local and cannot fail loudly.
+    await writeDone(slug, next);
+  }, [slug, done]);
+
+  /** Playing to the end marks it without the user having to say so. */
+  const markWatched = useCallback(async () => {
+    if (!slug || done) return;
+    setDoneState(true);
+    await writeDone(slug, true);
+  }, [slug, done]);
 
   const fetchDetails = useCallback(async () => {
     if (!videoData?.slug) {
@@ -275,7 +318,27 @@ const VideoScreen = ({ route, navigation }: any) => {
             videoUrl={videoDetails?.video ?? ''}
             thumbnailUrl={videoDetails?.cropped_thumbnail_url}
             title={videoDetails?.headline ?? 'Video'}
+            onWatched={markWatched}
           />
+
+          {/* The explicit mark. Tutorials get followed along with — paused,
+              rewound, sets repeated — so playing straight through is a poor
+              proxy for having done one. Watching to the end still marks it. */}
+          <TouchableOpacity
+            style={[styles.doneBtn, done && styles.doneBtnOn]}
+            onPress={toggleDone}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityState={{ checked: done }}
+            accessibilityLabel={done ? 'Marked as done' : 'Mark as done'}
+          >
+            <View style={[styles.doneTick, done && styles.doneTickOn]}>
+              {done && <Check size={12} color={theme.color.text.inverse} />}
+            </View>
+            <Text style={[styles.doneText, done && styles.doneTextOn]}>
+              {done ? 'Completed' : 'Mark as done'}
+            </Text>
+          </TouchableOpacity>
 
           {categories.length > 0 && (
             <View style={styles.tags}>
@@ -437,9 +500,44 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: theme.color.brand.base,
-    // Nudged right: the play triangle's optical centre sits left of its box.
-    paddingLeft: 3,
   },
+
+  doneBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.space.md,
+    minHeight: 48,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.color.border.default,
+    backgroundColor: theme.color.surface.card,
+    marginTop: theme.space.lg,
+  },
+  doneBtnOn: {
+    borderColor: theme.color.status.success,
+    backgroundColor: theme.color.status.successSubtle,
+  },
+  /** Empty ring → filled tick. The shape carries the state, not the hue. */
+  doneTick: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: theme.color.border.strong,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  doneTickOn: {
+    borderColor: theme.color.status.success,
+    backgroundColor: theme.color.status.success,
+  },
+  doneText: {
+    fontFamily: theme.font.semibold,
+    fontSize: theme.type.bodySm.fontSize,
+    color: theme.color.text.secondary,
+  },
+  doneTextOn: { color: theme.color.status.success },
 
   tags: {
     flexDirection: 'row',
@@ -508,7 +606,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(182,32,32,0.92)',
-    paddingLeft: 2,
   },
   moreTitle: {
     flex: 1,
@@ -580,15 +677,15 @@ const styles = StyleSheet.create({
     marginTop: theme.space.xl,
   },
   social: { alignItems: 'center', gap: theme.space.xs, width: 58 },
+  /** No plate behind the mark — each brand logo is already a finished
+      circular shape, and a grey disc under it drew a competing outline. */
   socialDisc: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.color.surface.sunken,
   },
-  socialImg: { width: 24, height: 24 },
+  socialImg: { width: 40, height: 40 },
   socialLabel: {
     fontFamily: theme.font.regular,
     fontSize: theme.type.caption.fontSize,

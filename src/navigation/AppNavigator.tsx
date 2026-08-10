@@ -23,6 +23,7 @@ import CoachDetailsScreen from '../screens/CoachDetailsScreen';
 import AboutScreen from '../screens/AboutScreen';
 import TestimonialsScreen from '../screens/TestimonialsScreen';
 import ContactScreen from '../screens/ContactScreen';
+import LegalScreen from '../screens/LegalScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import NewPasswordScreen from '../screens/NewPasswordScreen';
 
@@ -71,6 +72,8 @@ const AppNavigator = () => {
         <Stack.Screen name="About" component={AboutScreen} />
         <Stack.Screen name="Testimonials" component={TestimonialsScreen} />
         <Stack.Screen name="Contact" component={ContactScreen} />
+        {/* One screen for both documents; route param picks which. */}
+        <Stack.Screen name="Legal" component={LegalScreen} />
         <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
         <Stack.Screen name="NewPassword" component={NewPasswordScreen} />
       </Stack.Navigator>

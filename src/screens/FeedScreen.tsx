@@ -17,12 +17,16 @@ import SearchBar from '../components/ui/SearchBar';
 import FilterChips from '../components/ui/FilterChips';
 import MediaListCard from '../components/ui/MediaListCard';
 import { EmptyState, ErrorState, LoadingState } from '../components/ui/StateView';
-import { Filter, Info, Play } from '../components/ui/icons';
+import { Check, Filter, Info, Play } from '../components/ui/icons';
 import { getFeedCategories, getWorkoutTypes, getFeedList } from '../../app/helpers/ApiHelper';
 import EncryptedStorage from 'react-native-encrypted-storage';
 import { pushCleverTapEvent } from '../../App';
 import { checkSubscriptionAndProceed, hasActiveSubscription } from '../services/subscriptionService';
 import { useFocusEffect } from '@react-navigation/native';
+import {
+  loadAll as loadTutorialProgress,
+  TutorialProgressMap,
+} from '../services/tutorialProgress';
 
 const FeedScreen = ({ navigation }: any) => {
   const [search, setSearch] = useState('');
@@ -36,6 +40,7 @@ const FeedScreen = ({ navigation }: any) => {
   const [workoutTypes, setWorkoutTypes] = useState<any[]>([]);
   const [selectedWorkoutTypes, setSelectedWorkoutTypes] = useState<string[]>([]);
   const [feedData, setFeedData] = useState<any[]>([]);
+  const [tutorialProgress, setTutorialProgress] = useState<TutorialProgressMap>({});
   const [isLoadingFeed, setIsLoadingFeed] = useState(false);
   const [, setIsLoadingWorkoutTypes] = useState(false);
   const [feedError, setFeedError] = useState<string | null>(null);
@@ -68,6 +73,8 @@ const FeedScreen = ({ navigation }: any) => {
   useFocusEffect(
     useCallback(() => {
       fetchFeedData();
+      // Re-read on focus so a tutorial just marked done shows its tick.
+      loadTutorialProgress().then(setTutorialProgress);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigation])
   );
@@ -275,11 +282,20 @@ const FeedScreen = ({ navigation }: any) => {
 
 
   const query = search.trim().toLowerCase();
-  const visible = query
+  const matching = query
     ? feedData.filter((f: any) =>
         `${f?.name ?? ''} ${f?.headline ?? ''}`.toLowerCase().includes(query),
       )
     : feedData;
+
+  /**
+   * Free tutorials first, locked ones after — someone who cannot watch a
+   * thing should not have to scroll past it to reach what they can. The sort
+   * is stable, so the API's own ordering survives inside each group.
+   */
+  const visible = [...matching].sort(
+    (a: any, b: any) => Number(!!a?.locked) - Number(!!b?.locked),
+  );
 
   const categoryOptions = categories.map((c: any) => ({
     id: String(c?.name ?? c),
@@ -435,27 +451,37 @@ const FeedScreen = ({ navigation }: any) => {
               }
             />
           }
-          renderItem={({ item }: any) => (
-            <MediaListCard
-              title={item?.name ?? item?.headline ?? 'Untitled'}
-              body={
-                typeof item?.description === 'string'
-                  ? item.description
-                  : Array.isArray(item?.description)
-                  ? item.description.join(' ')
-                  : undefined
-              }
-              imageUrl={item?.cropped_thumbnail_url ?? item?.cropped_image_url}
-              meta={[
-                ...(item?.feed_type
-                  ? [{ icon: item.feed_type === 'video' ? Play : Info, label: item.feed_type }]
-                  : []),
-              ]}
-              locked={!!item?.locked}
-              badge={item?.is_paid_feed && !item?.locked ? 'Premium' : undefined}
-              onPress={() => onItemPress(item)}
-            />
-          )}
+          renderItem={({ item }: any) => {
+            const isDone = !!tutorialProgress[item?.slug]?.done;
+            return (
+              <MediaListCard
+                title={item?.name ?? item?.headline ?? 'Untitled'}
+                body={
+                  typeof item?.description === 'string'
+                    ? item.description
+                    : Array.isArray(item?.description)
+                    ? item.description.join(' ')
+                    : undefined
+                }
+                imageUrl={item?.cropped_thumbnail_url ?? item?.cropped_image_url}
+                meta={[
+                  ...(item?.feed_type
+                    ? [
+                        {
+                          icon: item.feed_type === 'video' ? Play : Info,
+                          label: item.feed_type,
+                        },
+                      ]
+                    : []),
+                  // Word and tick, not a colour — the row already carries type.
+                  ...(isDone ? [{ icon: Check, label: 'Completed' }] : []),
+                ]}
+                locked={!!item?.locked}
+                badge={item?.is_paid_feed && !item?.locked ? 'Premium' : undefined}
+                onPress={() => onItemPress(item)}
+              />
+            );
+          }}
         />
       )}
 

@@ -20,7 +20,6 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Linking,
   Platform,
   ScrollView,
   StatusBar,
@@ -41,7 +40,6 @@ import Superwall, {
 } from '@superwall/react-native-superwall';
 
 import { theme } from '../theme';
-import { Constants } from '../../app/config/constants';
 import { Check, ChevronRight, Lock } from '../components/ui/icons';
 
 /** Product IDs as configured in Play Console / App Store Connect. */
@@ -378,14 +376,14 @@ const PaywallScreen = ({ navigation, route }: any) => {
           </TouchableOpacity>
           <Text style={styles.linkSep}>·</Text>
           <TouchableOpacity
-            onPress={() => Linking.openURL(Constants.termsOfUseUrl)}
+            onPress={() => navigation.navigate('Legal', { doc: 'terms' })}
             hitSlop={theme.hitSlop}
           >
             <Text style={styles.link}>Terms</Text>
           </TouchableOpacity>
           <Text style={styles.linkSep}>·</Text>
           <TouchableOpacity
-            onPress={() => Linking.openURL(Constants.privacyPolicyUrl)}
+            onPress={() => navigation.navigate('Legal', { doc: 'privacy' })}
             hitSlop={theme.hitSlop}
           >
             <Text style={styles.link}>Privacy</Text>

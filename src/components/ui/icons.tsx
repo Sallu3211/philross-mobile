@@ -49,6 +49,15 @@ export const Menu: Icon = ({ size, color = INK }) => (
   </Base>
 );
 
+export const Home: Icon = ({ size, color = INK }) => (
+  <Base size={size}>
+    <Path
+      d="M11.02 2.62a1.6 1.6 0 011.96 0l7.6 5.9c.39.3.62.77.62 1.27v9.06a2.9 2.9 0 01-2.9 2.9h-3.2v-5.4a3.1 3.1 0 00-6.2 0v5.4H5.7a2.9 2.9 0 01-2.9-2.9V9.79c0-.5.23-.97.62-1.27l7.6-5.9z"
+      fill={color}
+    />
+  </Base>
+);
+
 export const ChevronRight: Icon = ({ size, color = INK }) => (
   <Base size={size}>
     <Path
@@ -70,11 +79,25 @@ export const Bell: Icon = ({ size, color = INK }) => (
 
 /* ── Content ────────────────────────────────────────────────────────────── */
 
+/**
+ * Play — a triangle whose *centroid* is the middle of the box, not its
+ * bounding box.
+ *
+ * The previous glyph centred the bounding box, which put the visual weight
+ * up and to the right; inside a round button it sat visibly off, and call
+ * sites were nudging it back with a paddingLeft. Corners are rounded by
+ * stroking the same colour with a round join, which grows the shape evenly
+ * and leaves the centroid at 12,12 — so no call site needs to compensate.
+ */
 export const Play: Icon = ({ size, color = INK }) => (
   <Base size={size}>
     <Path
-      d="M7.6 4.9c0-1.4 1.5-2.2 2.7-1.5l9.1 5.9a1.8 1.8 0 010 3l-9.1 5.9c-1.2.8-2.7-.1-2.7-1.5V4.9z"
+      d="M8.3 5.6L19.1 12 8.3 18.4Z"
       fill={color}
+      stroke={color}
+      strokeWidth="2.6"
+      strokeLinejoin="round"
+      strokeLinecap="round"
     />
   </Base>
 );
@@ -283,13 +306,26 @@ export const Phone: Icon = ({ size, color = INK }) => (
   </Base>
 );
 
-/** Three nodes joined by two links — the platform-neutral share mark. */
+/**
+ * Three nodes joined by two links — the platform-neutral share mark.
+ *
+ * Drawn as separate circles and strokes rather than one clever path. The
+ * single-path version had to trace the connectors and the discs in one
+ * continuous outline, and the joins came out ragged at 18px.
+ *
+ * Links are stroked first so the discs sit on top and hide the endpoints.
+ */
 export const Share: Icon = ({ size, color = INK }) => (
   <Base size={size}>
     <Path
-      d="M15.5 8.2a3.6 3.6 0 10-2.9-1.45L9.1 8.9a3.6 3.6 0 100 6.2l3.5 2.15a3.6 3.6 0 10.83-1.5l-3.5-2.15a3.6 3.6 0 000-1.2l3.5-2.15c.6.55 1.4.9 2.27.9z"
-      fill={color}
+      d="M8.4 10.6l7.2-4.1M8.4 13.4l7.2 4.1"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
     />
+    <Circle cx="17.3" cy="5.4" r="3.2" fill={color} />
+    <Circle cx="5.9" cy="12" r="3.2" fill={color} />
+    <Circle cx="17.3" cy="18.6" r="3.2" fill={color} />
   </Base>
 );
 
@@ -400,6 +436,7 @@ export const LockCircle: Icon = ({ size, color = INK, glyphColor = '#FFFFFF' }) 
 
 export const Icons = {
   Menu,
+  Home,
   ChevronRight,
   Bell,
   Play,

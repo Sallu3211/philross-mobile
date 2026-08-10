@@ -6,7 +6,8 @@
  * (isVisible / onClose / navigation) so no call site needed touching.
  *
  * Structure, top to bottom:
- *   dark header   brand + who you are + your plan
+ *   dark header   brand mark + name + your plan
+ *   dashboard     home, standing alone above the categories
  *   train         the things you do
  *   discover      the things you read or watch
  *   account       profile, contact, delete
@@ -14,8 +15,9 @@
  *   footer        version + log out
  *
  * Social marks use each brand's real logo. Facebook, Instagram, WhatsApp,
- * Telegram and X ship as full-colour PNGs; YouTube and TikTok only exist here
- * as monochrome SVGs, so those are tinted to their brand colour.
+ * Telegram and X ship as full-colour PNG badges; YouTube and TikTok are drawn
+ * as matching discs in ui/brandMarks, because the SVGs shipped here are
+ * rounded-rectangle glyphs that broke the row's one-shape rhythm.
  */
 
 import React, { useCallback, useEffect, useRef } from 'react';
@@ -47,6 +49,7 @@ import {
   Coach,
   Courses as CoursesIcon,
   Gift,
+  Home,
   Info,
   LogOut,
   Phone,
@@ -63,11 +66,13 @@ import InstagramLogo from '../../assets/icons/instagram.png';
 import WhatsappLogo from '../../assets/icons/whatsapp.png';
 import TelegramLogo from '../../assets/icons/telegram.png';
 import XLogo from '../../assets/icons/x_icon.png';
-import YouTubeMark from '../../assets/icons/mdi_youtube.svg';
-import TikTokMark from '../../assets/icons/ic_baseline-tiktok.svg';
+import { TikTokRound, YouTubeRound } from './ui/brandMarks';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const DRAWER_W = Math.min(SCREEN_W * 0.84, 340);
+
+/** One size for every social mark — PNG badge or drawn disc alike. */
+const SOCIAL_SIZE = 32;
 
 /**
  * Every outbound link in one place. Swap a URL here and it changes everywhere;
@@ -95,11 +100,27 @@ interface Item {
   icon: React.FC<IconProps>;
   tint: string;
   onPress: () => void;
+  /** Navigator route this item leads to, so the current one can be marked. */
+  route?: string;
   danger?: boolean;
 }
 
 const SideMenu = ({ isVisible, onClose, navigation }: SideMenuProps) => {
-  const { user, getUserInitial, logout, isSubscribed } = useUser();
+  const { logout, isSubscribed } = useUser();
+
+  /**
+   * The route the drawer opened over. Marking it means the menu answers
+   * "where am I" as well as "where can I go" — the one thing the old one
+   * could not do.
+   */
+  const currentRoute: string | undefined = (() => {
+    try {
+      const state = navigation.getState?.();
+      return state?.routes?.[state.index]?.name;
+    } catch (e) {
+      return undefined;
+    }
+  })();
 
   const slide = useRef(new Animated.Value(-DRAWER_W)).current;
   const fade = useRef(new Animated.Value(0)).current;
@@ -181,9 +202,22 @@ const SideMenu = ({ isVisible, onClose, navigation }: SideMenuProps) => {
     );
   }, [logout, navigation, onClose]);
 
+  /** Home sits above the groups — it is where you go back to, not a category. */
+  const home: Item[] = [
+    {
+      key: 'dashboard',
+      route: 'Dashboard',
+      label: 'Dashboard',
+      icon: Home,
+      tint: theme.color.text.primary,
+      onPress: () => go('Dashboard'),
+    },
+  ];
+
   const train: Item[] = [
     {
       key: 'tutorials',
+      route: 'Feed',
       label: 'Tutorials',
       icon: Play,
       tint: theme.color.brand.base,
@@ -191,6 +225,7 @@ const SideMenu = ({ isVisible, onClose, navigation }: SideMenuProps) => {
     },
     {
       key: 'courses',
+      route: 'Courses',
       label: 'Courses',
       icon: CoursesIcon,
       tint: theme.color.status.info,
@@ -198,6 +233,7 @@ const SideMenu = ({ isVisible, onClose, navigation }: SideMenuProps) => {
     },
     {
       key: 'coach',
+      route: 'MyCoach',
       label: 'My Coach',
       icon: Coach,
       tint: theme.color.status.success,
@@ -205,6 +241,7 @@ const SideMenu = ({ isVisible, onClose, navigation }: SideMenuProps) => {
     },
     {
       key: 'events',
+      route: 'Events',
       label: 'Events',
       icon: Calendar,
       tint: theme.color.progress.fill,
@@ -215,6 +252,7 @@ const SideMenu = ({ isVisible, onClose, navigation }: SideMenuProps) => {
   const discover: Item[] = [
     {
       key: 'books',
+      route: 'Products',
       label: 'Books & Gear',
       icon: Shop,
       tint: theme.color.brand.base,
@@ -222,6 +260,7 @@ const SideMenu = ({ isVisible, onClose, navigation }: SideMenuProps) => {
     },
     {
       key: 'testimonials',
+      route: 'Testimonials',
       label: 'Testimonials',
       icon: Star,
       tint: theme.color.progress.fill,
@@ -229,6 +268,7 @@ const SideMenu = ({ isVisible, onClose, navigation }: SideMenuProps) => {
     },
     {
       key: 'about',
+      route: 'About',
       label: 'About Phil',
       icon: Info,
       tint: theme.color.neutral[600],
@@ -239,6 +279,7 @@ const SideMenu = ({ isVisible, onClose, navigation }: SideMenuProps) => {
   const account: Item[] = [
     {
       key: 'profile',
+      route: 'Profile',
       label: 'Profile & settings',
       icon: UserIcon,
       tint: theme.color.neutral[600],
@@ -246,6 +287,7 @@ const SideMenu = ({ isVisible, onClose, navigation }: SideMenuProps) => {
     },
     {
       key: 'contact',
+      route: 'Contact',
       label: 'Contact us',
       icon: Phone,
       tint: theme.color.status.success,
@@ -263,30 +305,41 @@ const SideMenu = ({ isVisible, onClose, navigation }: SideMenuProps) => {
 
   const renderItem = (item: Item) => {
     const IconCmp = item.icon;
+    const active = !!item.route && item.route === currentRoute;
     return (
       <TouchableOpacity
         key={item.key}
-        style={styles.row}
+        style={[styles.row, active && styles.rowActive]}
         onPress={item.onPress}
         activeOpacity={0.7}
         accessibilityRole="button"
         accessibilityLabel={item.label}
+        accessibilityState={{ selected: active }}
       >
         <View style={[styles.rowIcon, { backgroundColor: item.tint }]}>
           <IconCmp size={15} color={theme.color.text.inverse} />
         </View>
-        <Text style={[styles.rowLabel, item.danger && styles.rowLabelDanger]}>
+        <Text
+          style={[
+            styles.rowLabel,
+            active && styles.rowLabelActive,
+            item.danger && styles.rowLabelDanger,
+          ]}
+        >
           {item.label}
         </Text>
+        {/* A bar rather than a tint alone, so "you are here" survives a
+            colour-blind read and a dim screen. */}
+        {active && <View style={styles.activeBar} />}
       </TouchableOpacity>
     );
   };
 
   const socials = [
-    { key: 'youtube', Svg: YouTubeMark, color: '#FF0000' },
+    { key: 'youtube', Svg: YouTubeRound },
     { key: 'instagram', png: InstagramLogo },
     { key: 'facebook', png: FacebookLogo },
-    { key: 'tiktok', Svg: TikTokMark, color: '#000000' },
+    { key: 'tiktok', Svg: TikTokRound },
     { key: 'x', png: XLogo },
     { key: 'whatsapp', png: WhatsappLogo },
     { key: 'telegram', png: TelegramLogo },
@@ -306,7 +359,13 @@ const SideMenu = ({ isVisible, onClose, navigation }: SideMenuProps) => {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerTop}>
-            <Image source={PhilrossLogo} style={styles.logo} resizeMode="contain" />
+            <View style={styles.brand}>
+              <Image source={PhilrossLogo} style={styles.logo} resizeMode="contain" />
+              <View style={styles.brandText}>
+                <Text style={styles.brandName}>MASTER PHIL</Text>
+                <Text style={styles.brandTag}>BodyBell Method®</Text>
+              </View>
+            </View>
             <TouchableOpacity
               onPress={onClose}
               style={styles.closeBtn}
@@ -318,22 +377,9 @@ const SideMenu = ({ isVisible, onClose, navigation }: SideMenuProps) => {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.identity}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText} allowFontScaling={false}>
-                {getUserInitial()}
-              </Text>
-            </View>
-            <View style={styles.identityText}>
-              <Text style={styles.name} numberOfLines={1}>
-                {user?.fullName?.trim() || 'Welcome'}
-              </Text>
-              <Text style={styles.email} numberOfLines={1}>
-                {user?.email ?? ''}
-              </Text>
-            </View>
-          </View>
-
+          {/* No name or email here — the profile avatar already sits in the
+              top right of every screen, and repeating it made the drawer
+              open on the one thing nobody came here to read. */}
           <View style={styles.planChip}>
             {isSubscribed ? (
               <Check size={12} color={theme.color.status.successOnDark} />
@@ -361,6 +407,9 @@ const SideMenu = ({ isVisible, onClose, navigation }: SideMenuProps) => {
           contentContainerStyle={styles.bodyContent}
           showsVerticalScrollIndicator={false}
         >
+          {/* No group label — it stands alone above the categories. */}
+          {home.map(renderItem)}
+
           <Text style={styles.groupLabel}>Train</Text>
           {train.map(renderItem)}
 
@@ -379,14 +428,15 @@ const SideMenu = ({ isVisible, onClose, navigation }: SideMenuProps) => {
                     key={s.key}
                     style={styles.socialBtn}
                     onPress={() => openLink(SOCIAL_LINKS[s.key] as string)}
-                    activeOpacity={0.75}
+                    activeOpacity={0.6}
+                    hitSlop={theme.hitSlop}
                     accessibilityRole="button"
                     accessibilityLabel={s.key}
                   >
                     {s.png ? (
                       <Image source={s.png} style={styles.socialImg} resizeMode="contain" />
                     ) : (
-                      s.Svg && <s.Svg width={22} height={22} fill={s.color} />
+                      s.Svg && <s.Svg size={SOCIAL_SIZE} />
                     )}
                   </TouchableOpacity>
                 ))}
@@ -438,59 +488,47 @@ const styles = StyleSheet.create({
     }),
   },
 
+  /**
+   * Square bottom edge. The rounded bottom-right corner cut into the drawer
+   * against a straight left edge and read as a rendering fault rather than a
+   * shape.
+   */
   header: {
     backgroundColor: theme.color.surface.logoGround,
     paddingHorizontal: theme.space.xl,
     paddingTop: Platform.OS === 'ios' ? 58 : 34,
-    paddingBottom: theme.space.xl,
-    borderBottomRightRadius: 26,
+    paddingBottom: theme.space.lg,
   },
   headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  logo: { width: 46, height: 46, marginLeft: -3 },
+  brand: { flexDirection: 'row', alignItems: 'center', gap: theme.space.md, flex: 1 },
+  logo: { width: 44, height: 44, marginLeft: -3 },
+  brandText: { flex: 1, minWidth: 0 },
+  brandName: {
+    fontFamily: theme.font.bold,
+    fontSize: theme.type.h3.fontSize,
+    letterSpacing: 1.1,
+    color: theme.color.text.inverse,
+    includeFontPadding: false,
+  },
+  brandTag: {
+    fontFamily: theme.font.regular,
+    fontSize: theme.type.overline.fontSize,
+    letterSpacing: 0.4,
+    color: theme.color.text.inverseMuted,
+    marginTop: 2,
+    includeFontPadding: false,
+  },
   closeBtn: {
     width: 34,
     height: 34,
-    borderRadius: theme.radius.sm,
+    borderRadius: 17,
     backgroundColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-
-  identity: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.space.md,
-    marginTop: theme.space.xl,
-  },
-  avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.color.brand.base,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    fontFamily: theme.font.bold,
-    fontSize: theme.type.h3.fontSize,
-    color: theme.color.text.onBrand,
-    includeFontPadding: false,
-  },
-  identityText: { flex: 1, minWidth: 0 },
-  name: {
-    fontFamily: theme.font.bold,
-    fontSize: theme.type.h3.fontSize,
-    color: theme.color.text.inverse,
-  },
-  email: {
-    fontFamily: theme.font.regular,
-    fontSize: theme.type.caption.fontSize,
-    color: theme.color.text.inverseMuted,
-    marginTop: 1,
   },
 
   planChip: {
@@ -499,8 +537,8 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     gap: 5,
     marginTop: theme.space.lg,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: theme.radius.pill,
     backgroundColor: 'rgba(255,255,255,0.10)',
   },
@@ -532,10 +570,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: theme.space.lg,
     paddingVertical: theme.space.md,
-    paddingHorizontal: theme.space.sm,
-    borderRadius: theme.radius.md,
+    paddingHorizontal: theme.space.md,
+    borderRadius: theme.radius.lg,
     minHeight: theme.minTouch,
   },
+  rowActive: { backgroundColor: theme.color.surface.card },
   rowIcon: {
     width: 30,
     height: 30,
@@ -549,24 +588,34 @@ const styles = StyleSheet.create({
     fontSize: theme.type.body.fontSize,
     color: theme.color.text.primary,
   },
+  rowLabelActive: { fontFamily: theme.font.semibold },
   rowLabelDanger: { color: theme.color.brand.base },
+  activeBar: {
+    width: 3,
+    height: 18,
+    borderRadius: 2,
+    backgroundColor: theme.color.brand.base,
+  },
 
   socialRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: theme.space.md,
-    paddingHorizontal: theme.space.sm,
+    gap: theme.space.lg,
+    paddingHorizontal: theme.space.md,
     marginTop: theme.space.xs,
   },
+  /**
+   * No plate behind the mark. Each brand logo is already a finished circular
+   * shape, so a rounded square under it drew a second, competing outline.
+   * The button keeps its 44pt touch area without painting anything.
+   */
   socialBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.color.surface.card,
+    width: 34,
+    height: 34,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  socialImg: { width: 22, height: 22 },
+  socialImg: { width: SOCIAL_SIZE, height: SOCIAL_SIZE },
 
   footer: {
     borderTopWidth: 1,

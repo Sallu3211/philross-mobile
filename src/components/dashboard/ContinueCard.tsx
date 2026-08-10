@@ -32,6 +32,15 @@ export interface ContinueItem {
   progress: number;
   imageUrl?: string | null;
   locked?: boolean;
+  /**
+   * The raw API object this card was built from.
+   *
+   * Feed items split two ways: a `feed_type` of 'video' opens the player,
+   * anything else opens the article. The dashboard was sending both to
+   * FeedDetails, so tapping a tutorial in "Fresh from Phil" showed it as an
+   * article. The player also wants the whole object, not just a slug.
+   */
+  source?: any;
 }
 
 export interface ContinueCardProps {
