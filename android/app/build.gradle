@@ -83,8 +83,8 @@ android {
         applicationId "com.philross"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 26
-        versionName "1.5"
+        versionCode 27
+        versionName "1.9"
     }
     
     configurations.all {
