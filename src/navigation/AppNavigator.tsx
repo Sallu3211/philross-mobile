@@ -24,6 +24,9 @@ import AboutScreen from '../screens/AboutScreen';
 import TestimonialsScreen from '../screens/TestimonialsScreen';
 import ContactScreen from '../screens/ContactScreen';
 import LegalScreen from '../screens/LegalScreen';
+import WorkoutsScreen from '../screens/WorkoutsScreen';
+import WorkoutListScreen from '../screens/WorkoutListScreen';
+import WorkoutDetailScreen from '../screens/WorkoutDetailScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import NewPasswordScreen from '../screens/NewPasswordScreen';
 
@@ -74,6 +77,11 @@ const AppNavigator = () => {
         <Stack.Screen name="Contact" component={ContactScreen} />
         {/* One screen for both documents; route param picks which. */}
         <Stack.Screen name="Legal" component={LegalScreen} />
+
+        {/* Workouts: categories -> list -> one written workout */}
+        <Stack.Screen name="Workouts" component={WorkoutsScreen} />
+        <Stack.Screen name="WorkoutList" component={WorkoutListScreen} />
+        <Stack.Screen name="WorkoutDetail" component={WorkoutDetailScreen} />
         <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
         <Stack.Screen name="NewPassword" component={NewPasswordScreen} />
       </Stack.Navigator>

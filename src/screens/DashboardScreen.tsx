@@ -52,6 +52,7 @@ import {
   LockCircle,
   Menu,
   Play,
+  Flame,
   ProgressCircle,
   Shop,
   IconProps,
@@ -144,11 +145,21 @@ const DashboardScreen = ({ navigation }: any) => {
   const actions: QuickAction[] = useMemo(
     () => [
       {
+        // First tile. Browsing the twelve categories is what members open the
+        // app to do; tutorials explain a movement, workouts are the session.
+        key: 'workouts',
+        label: 'Workouts',
+        icon: Flame,
+        tint: theme.color.brand.base,
+        tintBg: theme.color.brand.subtle,
+        onPress: () => navigation.navigate('Workouts'),
+      },
+      {
         key: 'feed',
         label: 'Tutorials',
         icon: Play,
-        tint: theme.color.brand.base,
-        tintBg: theme.color.brand.subtle,
+        tint: theme.color.status.warning,
+        tintBg: theme.color.status.warningSubtle,
         onPress: () => navigation.navigate('Feed'),
       },
       {

@@ -750,6 +750,78 @@ export const getCourseProgress = async (courseId: number, navigation: any) => {
     }
 };
 
+/* ── Workouts ────────────────────────────────────────────────────────────────
+ *
+ * The written workouts, browsed by the twelve categories the client
+ * specified. Separate from the feed: those are tutorial videos, these are
+ * text sessions the client writes themselves.
+ *
+ * Every filter here NARROWS. Passing more of them returns fewer workouts,
+ * never more — which is the whole point of the section.
+ */
+
+/** GET /workout/categories/ → the twelve, grouped, with live counts. */
+export const getWorkoutCategories = async (navigation: any) => {
+    try {
+        return await apiCall({
+            endPoint: 'workout/categories/',
+            method: 'GET',
+            navigation,
+            isMultipart: false,
+        });
+    } catch (error) {
+        return { success: false, message: 'Failed to load workout categories.' };
+    }
+};
+
+export const getWorkouts = async (
+    navigation: any,
+    params?: {
+        /** Category id or slug. */
+        category?: string | number;
+        group?: 'kettlebell' | 'other';
+        level?: string;
+        search?: string;
+        /** Comma separated; a workout must need every item named. */
+        equipment?: string;
+        max_minutes?: number;
+    },
+) => {
+    try {
+        const query = new URLSearchParams();
+        if (params?.category) query.append('category', String(params.category));
+        if (params?.group) query.append('group', params.group);
+        if (params?.level) query.append('level', params.level);
+        if (params?.search) query.append('search', params.search);
+        if (params?.equipment) query.append('equipment', params.equipment);
+        if (params?.max_minutes) query.append('max_minutes', String(params.max_minutes));
+
+        const qs = query.toString();
+        return await apiCall({
+            endPoint: qs ? `workout/?${qs}` : 'workout/',
+            method: 'GET',
+            navigation,
+            isMultipart: false,
+        });
+    } catch (error) {
+        return { success: false, message: 'Failed to load workouts.' };
+    }
+};
+
+/** GET /workout/{slug}/ — `steps` come back empty when the workout is locked. */
+export const getWorkoutDetail = async (slug: string, navigation: any) => {
+    try {
+        return await apiCall({
+            endPoint: `workout/${slug}/`,
+            method: 'GET',
+            navigation,
+            isMultipart: false,
+        });
+    } catch (error) {
+        return { success: false, message: 'Failed to load this workout.' };
+    }
+};
+
 /* ── Tutorial (feed) completion ──────────────────────────────────────────────
  *
  * These call endpoints the API does not serve yet. They are written now, and

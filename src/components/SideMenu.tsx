@@ -48,6 +48,7 @@ import {
   Close,
   Coach,
   Courses as CoursesIcon,
+  Flame,
   Gift,
   Home,
   Info,
@@ -216,11 +217,22 @@ const SideMenu = ({ isVisible, onClose, navigation }: SideMenuProps) => {
 
   const train: Item[] = [
     {
+      // First in Train, and above Tutorials: browsing the twelve categories is
+      // the thing members came to do. Tutorials are how Phil explains a
+      // movement; workouts are the session you actually follow.
+      key: 'workouts',
+      route: 'Workouts',
+      label: 'Workouts',
+      icon: Flame,
+      tint: theme.color.brand.base,
+      onPress: () => go('Workouts'),
+    },
+    {
       key: 'tutorials',
       route: 'Feed',
       label: 'Tutorials',
       icon: Play,
-      tint: theme.color.brand.base,
+      tint: theme.color.status.warning,
       onPress: () => go('Feed'),
     },
     {
