@@ -1,8 +1,24 @@
 # Backend requirements — account-wide profile & progress
 
 **For:** the PhilRoss API team
-**Date:** 10 August 2026
-**Why:** The mobile app cannot make a name change or training progress follow the account. Not because the app is wrong — because the endpoints do not exist. This document is the complete list of what is missing and the code to add it.
+**Written:** 10 August 2026
+**Status:** ✅ **Sections 3 and 4 are built and deployed** (13 Aug 2026). Section 5 remains.
+
+---
+
+> ## ⚠️ Read this first
+>
+> Most of this document describes work that is **done**. It is kept because the reasoning and the contracts are still the reference.
+>
+> | Section | State |
+> |---|---|
+> | §3 Profile | ✅ Live. Server commit `4bb95c0` |
+> | §4 Tutorial progress | ✅ Live. Server commit `81ad9c6` |
+> | §5 Course video progress | 🟡 **Still outstanding** — the only one left |
+>
+> A fourth fault turned up that this document did not anticipate: **social login was overwriting `full_name` on every sign-in**, so even after the profile endpoint existed, a saved name reverted at the next login. Fixed in server commit `f41b96b`. A name is not something a user re-asserts by signing in.
+>
+> The API is now 33 paths, up from 30. No app release was required for any of it.
 
 ---
 
@@ -44,7 +60,7 @@ Every request below is **already written and wired**. Nothing on the mobile side
 
 ---
 
-## 3. Profile — `/accounts/profile/`
+## 3. Profile ✅ DONE — `/accounts/profile/`
 
 **Effect:** a name changed on one phone shows on every device and survives a reinstall.
 
@@ -95,7 +111,7 @@ path('profile/', ProfileView.as_view(), name='profile'),
 
 ---
 
-## 4. Tutorial progress — `/feed/progress/` and `/feed/{slug}/completed/`
+## 4. Tutorial progress ✅ DONE — `/feed/progress/` and `/feed/{slug}/completed/`
 
 **Effect:** completed tutorials come back after a reinstall, and the dashboard ring is the same on every device.
 
@@ -171,7 +187,7 @@ path('<slug:slug>/completed/', FeedCompletedView.as_view(), name='feed-completed
 
 ---
 
-## 5. Course video progress — fix the existing endpoint
+## 5. Course video progress 🟡 OUTSTANDING — fix the existing endpoint
 
 `POST /course/{id}/video_watched/` **already exists**, but two things stop it working.
 
@@ -197,11 +213,11 @@ Until this exists the app recalculates from its own device storage, so course pr
 
 | # | Endpoint | Effort | Fixes |
 |---|---|---|---|
-| 1 | `GET`/`PATCH /accounts/profile/` | ~15 min | Name change does nothing today |
-| 2 | `GET /feed/progress/` + `POST /feed/{slug}/completed/` | ~1 hour | Progress lost on reinstall |
-| 3 | Read the body in `video_watched/`, add `GET /course/progress/` | ~1 hour | Course progress always reads 0% |
+| 1 | `GET`/`PATCH /accounts/profile/` | ✅ done | Name change now saves to the account |
+| 2 | `GET /feed/progress/` + `POST /feed/{slug}/completed/` | ✅ done | Tutorial progress survives reinstall |
+| 3 | Read the body in `video_watched/`, add `GET /course/progress/` | 🟡 **~1 hour, remaining** | Course progress always reads 0% |
 
-**(1) is the smallest and unblocks a feature that is currently visibly broken to every user.**
+**Only (3) is left.**
 
 ---
 

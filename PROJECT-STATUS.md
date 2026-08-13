@@ -1,6 +1,6 @@
 # Master Phil / PhilRoss — Mobile App Project Status
 
-**Last updated:** 2026-08-10
+**Last updated:** 2026-08-13
 **Purpose:** Single reference for what this app is, where every piece lives, what has been done so far, and how to safely make the next client revision.
 
 ---
@@ -14,20 +14,21 @@
 | Local folder | `d:\arab projects code\master phil app` |
 | GitHub repo | https://github.com/Sallu3211/philross-mobile.git |
 | Default branch | `master` (⚠️ not `main`) |
-| Active work branch | `feat/dashboard-ui` — all UI work since 6 Aug lives here, **not yet merged to `master`** |
 | Repo owner account | `Sallu3211` |
 | Pushed via | `byterisellc` GitHub account (has write access) |
 | Commit author identity | `PhilRoss Dev <info@byterisellc.com>` |
 | Bundle ID / Package | `com.philross` (same on both platforms) |
 | Apple Team ID | `5YVZZNUTR7` |
-| Android version | `versionCode 26`, `versionName 1.5` |
-| iOS version | `MARKETING_VERSION 1.8`, build auto-incremented by CI |
+| Android version | `versionCode 27`, `versionName 1.9` |
+| iOS version | `MARKETING_VERSION 1.9` — live on TestFlight |
 | Backend API | `https://api.philross.com/` |
 | Package manager | Yarn 1.22.10 (`yarn.lock` is authoritative) |
 | Node required | >= 18 (CI uses 20.19.0) |
 | CI/CD | Codemagic (`codemagic.yaml`) |
-| Sync status | `95d3c21` on `feat/dashboard-ui` — committed locally, **push pending re-auth** |
+| Sync status | `master` in sync with GitHub; all UI work merged |
 | Backend host | AWS EC2 `18.225.28.46`, `us-east-2` (Ohio), Ubuntu + nginx 1.24 — see §11 |
+| Backend source | `/home/ubuntu/Backend/philross-be/` **on the server**, git repo, branch `main` |
+| Backend access | `philross-dev` IAM user + EC2 Instance Connect — see §11 |
 
 ---
 
@@ -345,11 +346,12 @@ Every screen in `src/` now resolves through `src/theme` and the shared `ui/` kit
 1. **The paywall over-promises.** Its copy says "Every structured training programme", but the subscription unlocks **feed tutorials only** — courses are sold separately through external Stripe links at $199–$499. Either the copy narrows or courses come inside the subscription. This is a commercial decision, not a code one.
 2. **Applications do not say which programme they are for.** `IntakeFormScreen` receives `coachId` on the route but the payload's `coach` field was commented out before this work. Adding it back is a backend question — confirm the API accepts it first.
 
-*Backend gaps — see [BACKEND-REQUIREMENTS.md](BACKEND-REQUIREMENTS.md) for the fix*
-3. 🔴 **The API has no profile endpoint.** Not "it's broken" — the route was never created. Confirmed against the live OpenAPI schema: 30 paths, none of which read or write a user. So changing your name cannot reach the server, and the app falls back to saving on the device. **~15 minutes of Django work** and it is fixed; the app already sends the right request.
-4. 🔴 **No tutorial-progress endpoint either.** Completions live only on the phone, so a reinstall wipes them. The app is already written server-first — `loadAll()` asks the server and only falls back to its cache — so the two endpoints in the requirements doc are all that is needed.
-5. 🟡 **`POST /course/{id}/video_watched/` exists but ignored its body.** Every field was commented out in the app, so the server received a bare ping and could never know a watch percentage — which is why `course_completed` returns `"0 %"` regardless. The app now sends real data; the view still needs to read it, and there is still no GET to read progress back.
-6. ✅ **Subscriptions are not a gap after all.** `/payments/webhooks/revenuecat/` **does exist** in the schema — an earlier version of this document was wrong to say the backend knows nothing about them.
+*Backend — the gaps are closed*
+
+3. ✅ **Profile endpoint built and deployed.** `GET`/`PATCH /accounts/profile/` now exists. See §12.
+4. ✅ **Tutorial progress endpoint built and deployed.** `GET /feed/progress/` and `POST /feed/{slug}/completed/`. Completions survive a reinstall and follow the account.
+5. 🟡 **Course video progress is still device-only.** `POST /course/{id}/video_watched/` now receives a real body from the app, but the view does not read it and there is no `GET /course/progress/`, so `course_completed` still returns `"0 %"`. Last of the three.
+6. 🟡 **`feed/migrations` is in `.gitignore`.** Migration `0011_feedprogress` is applied on the server but not in version control, so a fresh checkout needs `makemigrations` before it can `migrate`. Pre-existing convention, worth revisiting.
 
 *Housekeeping*
 7. **Splash logo is blank.** Commit `41b64b5` removed the logo as a stopgap for the Android 12+ crop/zoom bug. Note that every current logo asset bakes in a black background with **no alpha channel**, which is why the side-menu masthead sits on pure black — a transparent PNG would fix both.
@@ -473,22 +475,40 @@ Note this is a *separate* exposure from the Codemagic one in Phase 7. Both need 
 
 ---
 
-## 12. What The Backend Is Missing
+## 12. Backend Work Done (13 Aug 2026)
 
-Confirmed against the live schema, not assumed:
+Three faults sat behind "the name change does not work". It was never one bug.
 
-```bash
-curl -s "https://api.philross.com/swagger/?format=openapi"
+| # | Where | What was wrong |
+|---|---|---|
+| 1 | Server | `/accounts/profile/` did not exist — every save 404'd |
+| 2 | Server | Social login reassigned `full_name` from Google/Apple on **every** sign-in, so a saved name reverted at the next login |
+| 3 | App | Read `data.user.full_name`, but social login returns `data.full_name` — flat, not nested. The lookup missed, so it fell through to the device's Google name |
+
+The two login endpoints answer in different shapes, which is what hid fault 3:
+
+```
+POST accounts/login/              →  data.user.full_name   (nested)
+POST accounts/social-auth-login/  →  data.full_name        (flat)
 ```
 
-**30 paths.** None of them read or write a user profile. None of them read or write tutorial progress.
+### Endpoints added
 
-| Missing | Breaks | Effort |
-|---|---|---|
-| `GET`/`PATCH /accounts/profile/` | Name change cannot save — the visible bug | ~15 min |
-| `GET /feed/progress/` + `POST /feed/{slug}/completed/` | Completed tutorials lost on reinstall | ~1 hr |
-| Body handling in `video_watched/` + `GET /course/progress/` | `course_completed` always returns `"0 %"` | ~1 hr |
+```
+GET   /accounts/profile/          full_name writable; email read-only
+PATCH /accounts/profile/          PUT delegates to PATCH
+GET   /feed/progress/             completed tutorials for this user
+POST  /feed/{slug}/completed/     mark done / undo, idempotent
+```
 
-**The app is already written for all three.** `src/services/tutorialProgress.ts` asks the server first and only falls back to its device cache; `updateProfile` sends the correct PATCH; `updateVideoProgress` now sends a real body instead of the empty one it had. Nothing on the mobile side changes when these ship, and **no app release is needed** — the calls simply stop returning 404.
+The API went from 30 paths to 33. Server commits: `4bb95c0`, `f41b96b`, `81ad9c6`.
 
-Full contracts and Django implementations: **[BACKEND-REQUIREMENTS.md](BACKEND-REQUIREMENTS.md)**.
+`FeedProgress` is unique on `(user, feed)` — that is what makes the POST idempotent, since the app queues marks made offline and replays them on the next read.
+
+⚠️ In `feed/urls.py`, `progress/` **must** precede `<str:slug>/`. Otherwise Django resolves "progress" as a tutorial slug and the list 404s.
+
+**No app release was needed for any of it.** The client already sent these requests — its progress service was written server-first and had been falling back to its device cache.
+
+### Still outstanding
+
+`POST /course/{id}/video_watched/` exists and now receives a real body from the app, but the view does not read it, and there is no `GET /course/progress/`. Until both are done, `course_completed` returns `"0 %"` however much has been watched, and course progress is still device-only.
