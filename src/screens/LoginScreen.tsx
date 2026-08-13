@@ -337,12 +337,29 @@ const LoginScreen = ({ navigation, route }: any) => {
 
         const userData = {
           email: authData.email?.trim() || '',
+          /**
+           * The two login endpoints return different shapes, and this only
+           * handled one of them.
+           *
+           *   POST accounts/login/              → data.user.full_name  (nested)
+           *   POST accounts/social-auth-login/  → data.full_name       (flat)
+           *
+           * Reading only the nested form meant every Google sign-in fell
+           * through to `authData.name` — the name on the device's Google
+           * account — so a name the user had set in Profile was replaced by
+           * their Google name on every login. The server had it right the
+           * whole time; the app was not reading it.
+           *
+           * The provider's name stays as a last resort, for a brand-new
+           * account the server has no name for yet.
+           */
           fullName:
             response?.data?.user?.full_name ||
+            response?.data?.full_name ||
             response?.user?.full_name ||
             authData.name ||
             (authData.email ? authData.email.split('@')[0] : ''),
-          id: response?.data?.user_id || authData.sub,
+          id: response?.data?.user_id || response?.data?.user?.user_id || authData.sub,
           accessToken,
           refreshToken,
         };
@@ -370,9 +387,12 @@ const LoginScreen = ({ navigation, route }: any) => {
         }
 
         await onUserLoginCleverTap({
-          id: String(response?.data?.user?.id ?? response?.user?.id ?? authData.sub),
+          // Same two shapes as above — analytics should record the account's
+          // name, not whatever the device's Google account happens to say.
+          id: String(userData.id),
           name:
             response?.data?.user?.full_name ??
+            response?.data?.full_name ??
             response?.user?.full_name ??
             authData.name ??
             authData.email?.split('@')[0] ??
