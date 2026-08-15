@@ -60,56 +60,62 @@ export const HeroProgressCard: React.FC<HeroProgressCardProps> = ({
     end={{ x: 1, y: 1 }}
     style={styles.card}
   >
-    <View style={styles.left}>
-      <StatusChip label={planLabel} tone={planTone} icon={planIcon} onDark />
+    <StatusChip label={planLabel} tone={planTone} icon={planIcon} onDark />
 
-      <Text style={styles.title} numberOfLines={1}>
-        Your progress
-      </Text>
-      {!!subtitle && (
-        <Text style={styles.subtitle} numberOfLines={2}>
-          {subtitle}
+    {/* Row one: the words, and the ring beside them. Only these two compete
+        for width, and the text is free to wrap into the height it needs. */}
+    <View style={styles.headRow}>
+      <View style={styles.headText}>
+        <Text style={styles.title} numberOfLines={2}>
+          Your progress
         </Text>
-      )}
+        {!!subtitle && (
+          <Text style={styles.subtitle} numberOfLines={3}>
+            {subtitle}
+          </Text>
+        )}
+      </View>
 
-      <View style={styles.figures}>
-        <View style={styles.fig}>
-          <Text style={styles.figValue} allowFontScaling={false}>
-            {loading ? '—' : completedCount}
-          </Text>
-          <Text style={styles.figLabel} numberOfLines={1}>
-            Done
-          </Text>
-        </View>
-        <View style={styles.divider} />
-        <View style={styles.fig}>
-          <Text style={styles.figValue} allowFontScaling={false}>
-            {loading ? '—' : Math.max(totalCount - completedCount, 0)}
-          </Text>
-          <Text style={styles.figLabel} numberOfLines={1}>
-            Left
-          </Text>
-        </View>
+      <View style={styles.ringSlot}>
+        <ProgressRing
+          progress={loading ? 0 : progress}
+          size={RING}
+          strokeWidth={8}
+          color={theme.color.progress.fillOnDark}
+          trackColor={theme.color.progress.trackOnDark}
+          label={loading ? '—' : `${exactPercent(progress)}%`}
+          labelColor={theme.color.text.inverse}
+          labelSize={theme.scale.font(20)}
+          caption="complete"
+          captionColor={theme.color.text.inverseMuted}
+        />
       </View>
     </View>
 
-    {/* Fixed column that never shrinks. The ring is drawn at an exact pixel
-        size, so if the row runs out of room it is the text that must give,
-        not the ring — the alternative is the half-circle the card was
-        showing on wider iPhones. */}
-    <View style={styles.ringSlot}>
-      <ProgressRing
-        progress={loading ? 0 : progress}
-        size={RING}
-        strokeWidth={8}
-        color={theme.color.progress.fillOnDark}
-        trackColor={theme.color.progress.trackOnDark}
-        label={loading ? '—' : `${exactPercent(progress)}%`}
-        labelColor={theme.color.text.inverse}
-        labelSize={theme.scale.font(21)}
-        caption="complete"
-        captionColor={theme.color.text.inverseMuted}
-      />
+    {/* Row two: the figures get the full card width to themselves.
+        They used to share a column with the title and the ring, so on a
+        narrower phone they were the first thing squeezed — which is how the
+        labels went missing. Nothing can crowd them here. */}
+    <View style={styles.figures}>
+      <View style={styles.fig}>
+        <Text style={styles.figValue} allowFontScaling={false}>
+          {loading ? '—' : completedCount}
+        </Text>
+        <Text style={styles.figLabel} numberOfLines={1}>
+          Tutorials done
+        </Text>
+      </View>
+
+      <View style={styles.divider} />
+
+      <View style={styles.fig}>
+        <Text style={styles.figValue} allowFontScaling={false}>
+          {loading ? '—' : Math.max(totalCount - completedCount, 0)}
+        </Text>
+        <Text style={styles.figLabel} numberOfLines={1}>
+          Remaining
+        </Text>
+      </View>
     </View>
   </LinearGradient>
 );
@@ -128,52 +134,66 @@ const styles = StyleSheet.create({
    * every label is single-line. Nothing needs to be hidden because nothing
    * overflows.
    */
+  /**
+   * A column, not a row.
+   *
+   * Everything used to sit in one horizontal line: chip, title, subtitle and
+   * both figures crammed into a flexible column, with a fixed-width ring beside
+   * them. On a narrower phone with larger type the figures were the first thing
+   * squeezed, and their labels were pushed out of the card entirely.
+   *
+   * Stacking removes the competition. Only the title and the ring share a row
+   * now, and the figures get the full card width to themselves, so there is no
+   * width at which the labels can be crowded out.
+   *
+   * Padding is even on all four sides so the content sits inside a clear
+   * margin rather than against the card edge.
+   */
   card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: theme.space.lg,
-    paddingLeft: theme.space.xl,
+    padding: theme.space.xl,
     borderRadius: theme.radius['2xl'],
-    gap: theme.space.md,
+    gap: theme.space.lg,
     ...theme.shadow.lg,
   },
-  left: {
-    flex: 1,
-    minWidth: 0,
-    flexShrink: 1,
+
+  headRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space.lg,
   },
+  headText: { flex: 1, minWidth: 0 },
+  /** Fixed and unshrinkable — if the row runs short it is the text that gives. */
   ringSlot: { width: RING, flexShrink: 0, flexGrow: 0 },
+
   title: {
     fontFamily: theme.font.bold,
     fontSize: theme.type.h1.fontSize,
     lineHeight: theme.type.h1.lineHeight,
     letterSpacing: theme.type.h1.letterSpacing,
     color: theme.color.text.inverse,
-    marginTop: theme.space.md,
   },
   subtitle: {
     fontFamily: theme.font.regular,
     fontSize: theme.type.caption.fontSize,
-    lineHeight: theme.type.caption.lineHeight,
+    lineHeight: theme.type.caption.lineHeight + 3,
     color: theme.color.text.inverseSecondary,
-    marginTop: 2,
+    marginTop: theme.space.xs,
   },
+
+  /** Its own band, separated by a hairline, sharing the full card width. */
   figures: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: theme.space.lg,
+    paddingTop: theme.space.lg,
+    borderTopWidth: 1,
+    borderTopColor: theme.color.border.onDark,
   },
-  fig: {
-    // Was a 62pt minimum, which forced the row wider than the column on small
-    // screens and pushed the labels out of the card.
-    flexShrink: 1,
-    paddingRight: theme.space.md,
-  },
+  fig: { flex: 1, minWidth: 0 },
   divider: {
     width: 1,
-    height: 24,
+    height: 28,
     backgroundColor: theme.color.border.onDark,
-    marginRight: theme.space.md,
+    marginHorizontal: theme.space.lg,
   },
   figValue: {
     fontFamily: theme.font.bold,
