@@ -10,13 +10,26 @@
  */
 
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Dimensions, StyleSheet, Text, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { theme } from '../../theme';
 import { exactPercent } from '../../utils/percent';
 import ProgressRing from '../ui/ProgressRing';
 import StatusChip, { StatusTone } from '../ui/StatusChip';
 import { IconProps } from '../ui/icons';
+
+/**
+ * Ring size, taken from the real screen rather than a fixed 96.
+ *
+ * A ring is only worth the room it leaves the text beside it. At 24% of the
+ * screen it stays the same proportion of the card on an SE and on a Pro Max,
+ * and the bounds stop it collapsing on the narrowest phone or eating the
+ * card on the widest.
+ */
+const RING = Math.round(
+  Math.min(Math.max(Dimensions.get('window').width * 0.24, 76), 92),
+);
+
 
 export interface HeroProgressCardProps {
   /** 0–100 overall completion. */
@@ -64,43 +77,64 @@ export const HeroProgressCard: React.FC<HeroProgressCardProps> = ({
           <Text style={styles.figValue} allowFontScaling={false}>
             {loading ? '—' : completedCount}
           </Text>
-          <Text style={styles.figLabel}>Tutorials done</Text>
+          <Text style={styles.figLabel} numberOfLines={1}>
+            Done
+          </Text>
         </View>
         <View style={styles.divider} />
         <View style={styles.fig}>
           <Text style={styles.figValue} allowFontScaling={false}>
             {loading ? '—' : Math.max(totalCount - completedCount, 0)}
           </Text>
-          <Text style={styles.figLabel}>Remaining</Text>
+          <Text style={styles.figLabel} numberOfLines={1}>
+            Left
+          </Text>
         </View>
       </View>
     </View>
 
-    <ProgressRing
-      progress={loading ? 0 : progress}
-      size={96}
-      strokeWidth={9}
-      color={theme.color.progress.fillOnDark}
-      trackColor={theme.color.progress.trackOnDark}
-      label={loading ? '—' : `${exactPercent(progress)}%`}
-      labelColor={theme.color.text.inverse}
-      labelSize={24}
-      caption="complete"
-      captionColor={theme.color.text.inverseMuted}
-    />
+    {/* Fixed column that never shrinks. The ring is drawn at an exact pixel
+        size, so if the row runs out of room it is the text that must give,
+        not the ring — the alternative is the half-circle the card was
+        showing on wider iPhones. */}
+    <View style={styles.ringSlot}>
+      <ProgressRing
+        progress={loading ? 0 : progress}
+        size={RING}
+        strokeWidth={8}
+        color={theme.color.progress.fillOnDark}
+        trackColor={theme.color.progress.trackOnDark}
+        label={loading ? '—' : `${exactPercent(progress)}%`}
+        labelColor={theme.color.text.inverse}
+        labelSize={theme.scale.font(21)}
+        caption="complete"
+        captionColor={theme.color.text.inverseMuted}
+      />
+    </View>
   </LinearGradient>
 );
 
 const styles = StyleSheet.create({
+  /**
+   * No `overflow: hidden`.
+   *
+   * It used to be here to stop the text column pushing the ring past the card
+   * edge — but clipping is not a fix, it is a way of not seeing the problem.
+   * On wider iPhones, where the type scale is larger, it cut the ring in half
+   * and swallowed the figure labels entirely.
+   *
+   * The layout now guarantees the fit instead: the ring sits in a column that
+   * cannot shrink, the text column takes whatever is left and truncates, and
+   * every label is single-line. Nothing needs to be hidden because nothing
+   * overflows.
+   */
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: theme.space.xl,
+    padding: theme.space.lg,
+    paddingLeft: theme.space.xl,
     borderRadius: theme.radius['2xl'],
     gap: theme.space.md,
-    // The ring is a fixed 96pt; without this the text column could push it past
-    // the card edge on narrower phones, clipping the ring and the figure labels.
-    overflow: 'hidden',
     ...theme.shadow.lg,
   },
   left: {
@@ -108,6 +142,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
     flexShrink: 1,
   },
+  ringSlot: { width: RING, flexShrink: 0, flexGrow: 0 },
   title: {
     fontFamily: theme.font.bold,
     fontSize: theme.type.h1.fontSize,
