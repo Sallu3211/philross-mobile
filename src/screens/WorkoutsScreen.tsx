@@ -255,7 +255,7 @@ const WorkoutsScreen = ({ navigation }: any) => {
                     {group.key === 'kettlebell' ? (
                       <Flame size={14} color={theme.color.brand.base} />
                     ) : (
-                      <Coach size={14} color={theme.color.status.info} />
+                      <Coach size={14} color={theme.color.status.success} />
                     )}
                     <Text style={styles.groupLabel}>{group.label}</Text>
                     <Text style={styles.groupCount}>{rows.length}</Text>
@@ -303,9 +303,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.color.border.subtle,
   },
+  /** Dark, matching the numbered discs. A selected filter is a state, not an
+      action — the brand red is reserved for things you press to commit. */
   filterOn: {
-    backgroundColor: theme.color.brand.base,
-    borderColor: theme.color.brand.base,
+    backgroundColor: theme.color.surface.hero,
+    borderColor: theme.color.surface.hero,
   },
   filterText: {
     fontFamily: theme.font.medium,
@@ -361,15 +363,28 @@ const styles = StyleSheet.create({
   /** Empty categories stay tappable but stop competing for attention. */
   cardEmpty: { backgroundColor: theme.color.surface.raised },
 
+  /** Circular. A number in a disc reads as a step in a sequence; the same
+      number in a rounded square read as an app icon. */
   plate: {
     width: 42,
     height: 42,
-    borderRadius: 12,
+    borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  plateKettlebell: { backgroundColor: theme.color.brand.base },
-  plateOther: { backgroundColor: theme.color.status.info },
+  /**
+   * Both groups take the dark surface, not a colour each.
+   *
+   * The number says which step you are on; the group is already stated by the
+   * heading above the run of cards. Colouring the discs made the list argue
+   * with itself — twelve saturated plates competing with the one red thing on
+   * the screen that is actually a control.
+   *
+   * `surface.hero`, the same near-black as the drawer masthead, so it reads
+   * as the app's own ink rather than a new colour.
+   */
+  plateKettlebell: { backgroundColor: theme.color.surface.hero },
+  plateOther: { backgroundColor: theme.color.surface.hero },
   plateEmpty: { backgroundColor: theme.color.neutral[300] },
   plateNum: {
     fontFamily: theme.font.bold,
