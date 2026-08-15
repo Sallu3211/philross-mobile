@@ -34,7 +34,7 @@ import { theme } from '../theme';
 import ScreenHeader from '../components/ui/ScreenHeader';
 import SearchBar from '../components/ui/SearchBar';
 import { EmptyState, ErrorState, LoadingState } from '../components/ui/StateView';
-import { ChevronRight, Coach, Flame, Info } from '../components/ui/icons';
+import { Check, ChevronRight, Coach, Flame, Info } from '../components/ui/icons';
 import { getWorkoutCategories } from '../../app/helpers/ApiHelper';
 
 interface Category {
@@ -60,6 +60,7 @@ const WorkoutsScreen = ({ navigation }: any) => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [group, setGroup] = useState<Category['group'] | null>(null);
 
   const fetchCategories = useCallback(
     async (isRefresh = false) => {
@@ -89,10 +90,20 @@ const WorkoutsScreen = ({ navigation }: any) => {
     fetchCategories();
   }, [fetchCategories]);
 
+  /**
+   * Group is a filter, not just a heading.
+   *
+   * The client asked for the categories to be selectable rather than only
+   * searchable — typing is a poor way to choose from a list of twelve you can
+   * already see. Picking a group narrows to eight or four; search narrows
+   * further inside that. Both cut, neither adds.
+   */
   const query = search.trim().toLowerCase();
-  const visible = query
-    ? categories.filter(c => c.name.toLowerCase().includes(query))
-    : categories;
+  const visible = categories.filter(c => {
+    if (group && c.group !== group) return false;
+    if (query && !c.name.toLowerCase().includes(query)) return false;
+    return true;
+  });
 
   const totalWorkouts = categories.reduce(
     (sum, c) => sum + (c.workout_count || 0),
@@ -105,23 +116,39 @@ const WorkoutsScreen = ({ navigation }: any) => {
       categoryName: category.name,
     });
 
-  const renderCard = (category: Category) => {
+  const renderCard = (category: Category, index: number) => {
     const empty = !category.workout_count;
+    const kettlebell = category.group === 'kettlebell';
     return (
       <TouchableOpacity
         key={category.id}
-        style={styles.card}
+        style={[styles.card, empty && styles.cardEmpty]}
         onPress={() => openCategory(category)}
         activeOpacity={0.85}
         accessibilityRole="button"
         accessibilityLabel={`${category.name}, ${category.workout_count} workouts`}
       >
+        {/* A numbered plate rather than a repeated icon. Twelve rows of the
+            same glyph is noise; a number tells you where you are in the set
+            and gives each row something of its own. */}
+        <View
+          style={[
+            styles.plate,
+            kettlebell ? styles.plateKettlebell : styles.plateOther,
+            empty && styles.plateEmpty,
+          ]}
+        >
+          <Text style={styles.plateNum} allowFontScaling={false}>
+            {index + 1}
+          </Text>
+        </View>
+
         <View style={styles.cardText}>
           <Text style={styles.cardTitle} numberOfLines={1}>
             {category.name}
           </Text>
           {!!category.description && (
-            <Text style={styles.cardDesc} numberOfLines={1}>
+            <Text style={styles.cardDesc} numberOfLines={2}>
               {category.description}
             </Text>
           )}
@@ -132,7 +159,8 @@ const WorkoutsScreen = ({ navigation }: any) => {
               : `${category.workout_count} workout${category.workout_count === 1 ? '' : 's'}`}
           </Text>
         </View>
-        <ChevronRight size={16} color={theme.color.text.disabled} />
+
+        <ChevronRight size={15} color={theme.color.text.disabled} />
       </TouchableOpacity>
     );
   };
@@ -173,13 +201,49 @@ const WorkoutsScreen = ({ navigation }: any) => {
             style={styles.search}
           />
 
+          {/* Selectable, not only searchable. Twelve is a list you choose from,
+              not one you type into. */}
+          <View style={styles.filterRow}>
+            {[
+              { id: null, label: 'All', count: categories.length },
+              ...GROUPS.map(g => ({
+                id: g.key,
+                label: g.label,
+                count: categories.filter(c => c.group === g.key).length,
+              })),
+            ].map(f => {
+              const on = group === f.id;
+              return (
+                <TouchableOpacity
+                  key={String(f.id)}
+                  style={[styles.filter, on && styles.filterOn]}
+                  onPress={() => setGroup(f.id as Category['group'] | null)}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: on }}
+                >
+                  {on && <Check size={11} color={theme.color.text.onBrand} />}
+                  <Text style={[styles.filterText, on && styles.filterTextOn]}>
+                    {f.label}
+                  </Text>
+                  <Text style={[styles.filterCount, on && styles.filterCountOn]}>
+                    {f.count}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
           {visible.length === 0 ? (
             <EmptyState
               icon={Info}
-              title="No category matches that"
-              body="Try a different word, or clear the search."
-              actionLabel="Clear search"
-              onAction={() => setSearch('')}
+              title="Nothing matches that"
+              body="These filters narrow the list. Remove one to widen it again."
+              actionLabel="Clear filters"
+              onAction={() => {
+                setSearch('');
+                setGroup(null);
+              }}
             />
           ) : (
             GROUPS.map(group => {
@@ -196,7 +260,9 @@ const WorkoutsScreen = ({ navigation }: any) => {
                     <Text style={styles.groupLabel}>{group.label}</Text>
                     <Text style={styles.groupCount}>{rows.length}</Text>
                   </View>
-                  <View style={styles.groupCards}>{rows.map(renderCard)}</View>
+                  <View style={styles.groupCards}>
+                    {rows.map((c, i) => renderCard(c, i))}
+                  </View>
                 </View>
               );
             })
@@ -219,7 +285,45 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.space.screen,
     paddingBottom: theme.space['5xl'],
   },
-  search: { marginBottom: theme.space.lg },
+  search: { marginBottom: theme.space.md },
+
+  filterRow: {
+    flexDirection: 'row',
+    gap: theme.space.sm,
+    marginBottom: theme.space.xl,
+  },
+  filter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: theme.space.md,
+    minHeight: 36,
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.color.surface.card,
+    borderWidth: 1,
+    borderColor: theme.color.border.subtle,
+  },
+  filterOn: {
+    backgroundColor: theme.color.brand.base,
+    borderColor: theme.color.brand.base,
+  },
+  filterText: {
+    fontFamily: theme.font.medium,
+    fontSize: theme.type.caption.fontSize,
+    color: theme.color.text.secondary,
+  },
+  filterTextOn: {
+    fontFamily: theme.font.semibold,
+    color: theme.color.text.onBrand,
+  },
+  /** The count is the point of the chip — it says how much this cut leaves. */
+  filterCount: {
+    fontFamily: theme.font.semibold,
+    fontSize: theme.type.overline.fontSize,
+    color: theme.color.text.disabled,
+    includeFontPadding: false,
+  },
+  filterCountOn: { color: 'rgba(255,255,255,0.7)' },
 
   group: { marginBottom: theme.space.xl },
   groupHead: {
@@ -248,12 +352,32 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.space.md,
+    gap: theme.space.lg,
     backgroundColor: theme.color.surface.card,
-    borderRadius: 14,
+    borderRadius: 16,
     paddingHorizontal: theme.space.lg,
     paddingVertical: theme.space.lg,
   },
+  /** Empty categories stay tappable but stop competing for attention. */
+  cardEmpty: { backgroundColor: theme.color.surface.raised },
+
+  plate: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  plateKettlebell: { backgroundColor: theme.color.brand.base },
+  plateOther: { backgroundColor: theme.color.status.info },
+  plateEmpty: { backgroundColor: theme.color.neutral[300] },
+  plateNum: {
+    fontFamily: theme.font.bold,
+    fontSize: theme.type.h3.fontSize,
+    color: theme.color.text.onBrand,
+    includeFontPadding: false,
+  },
+
   cardText: { flex: 1, minWidth: 0 },
   cardTitle: {
     fontFamily: theme.font.semibold,

@@ -750,6 +750,52 @@ export const getCourseProgress = async (courseId: number, navigation: any) => {
     }
 };
 
+/* ── Subscription state on the server ────────────────────────────────────────
+ *
+ * The app and the server each decide independently whether someone has paid.
+ * The app asks the RevenueCat SDK, which knows immediately. The server keeps
+ * its own flag in redis, written only when RevenueCat's webhook arrives — so
+ * between a completed purchase and that webhook, the app unlocks while the
+ * server is still serving `locked: true`.
+ *
+ * `refreshServerSubscription` closes that window: call it once after a
+ * purchase or a restore and the server re-checks RevenueCat there and then.
+ */
+
+/** POST — forces the server to re-check RevenueCat and rewrite its flag. */
+export const refreshServerSubscription = async (
+    navigation: any,
+    revenueCatAppUserId?: string,
+) => {
+    try {
+        return await apiCall({
+            endPoint: 'payments/subscription-status/',
+            method: 'POST',
+            data: revenueCatAppUserId
+                ? { revenue_cat_app_user_id: revenueCatAppUserId }
+                : {},
+            navigation,
+            isMultipart: false,
+        });
+    } catch (error) {
+        return { success: false, message: 'Could not refresh subscription state.' };
+    }
+};
+
+/** GET — reads the server's cached flag without calling out to RevenueCat. */
+export const getServerSubscription = async (navigation: any) => {
+    try {
+        return await apiCall({
+            endPoint: 'payments/subscription-status/',
+            method: 'GET',
+            navigation,
+            isMultipart: false,
+        });
+    } catch (error) {
+        return { success: false, message: 'Could not read subscription state.' };
+    }
+};
+
 /* ── Workouts ────────────────────────────────────────────────────────────────
  *
  * The written workouts, browsed by the twelve categories the client

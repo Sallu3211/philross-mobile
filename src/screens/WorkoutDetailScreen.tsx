@@ -182,9 +182,18 @@ const WorkoutDetailScreen = ({ route, navigation }: any) => {
                 </View>
 
                 {steps.length > 1 && (
+                  /**
+                   * Not the app's progress green. #00FF00 is chosen for the
+                   * dark hero card, where it is vivid; on this white card it
+                   * sits at 1.4:1 and reads as a smear rather than a bar.
+                   * The completion green is a real colour at 3.4:1, and it is
+                   * what "done" already means everywhere else in the app.
+                   */
                   <LinearMeter
                     progress={progress}
-                    height={5}
+                    height={6}
+                    color={theme.color.status.success}
+                    trackColor={theme.color.status.successSubtle}
                     style={styles.meter}
                   />
                 )}

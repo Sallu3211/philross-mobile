@@ -1,3 +1,12 @@
+import {
+  deviceScale,
+  isLargePhone,
+  scaleFont,
+  scaleSize,
+  step,
+  textBase,
+} from './typography';
+
 /**
  * Master Phil — Design System
  * ---------------------------------------------------------------------------
@@ -199,18 +208,36 @@ export const theme = {
   /**
    * Type scale. Montserrat runs optically large and wide, so sizes are a shade
    * smaller and line-heights tighter than the previous Playfair/Open Sans pair.
+   *
+   * ⚠️ These are the *design* numbers, expressed at a 390pt baseline. Every
+   * step goes through `step()`, which scales it for the device and corrects
+   * the platform difference in letter tracking — so an iPhone 15 Pro Max no
+   * longer renders the same 14pt body as an SE. Never hard-code a fontSize in
+   * a screen; take it from here and it stays right on every handset.
+   *
+   * See src/theme/typography.ts for what the scaling actually does and why.
    */
   type: {
-    hero: { fontSize: 44, lineHeight: 46, letterSpacing: -1.4 },
-    display: { fontSize: 30, lineHeight: 34, letterSpacing: -0.8 },
-    h1: { fontSize: 22, lineHeight: 27, letterSpacing: -0.5 },
-    h2: { fontSize: 18, lineHeight: 23, letterSpacing: -0.35 },
-    h3: { fontSize: 16, lineHeight: 21, letterSpacing: -0.2 },
-    body: { fontSize: 14, lineHeight: 20, letterSpacing: -0.1 },
-    bodySm: { fontSize: 13, lineHeight: 18, letterSpacing: -0.05 },
-    caption: { fontSize: 11.5, lineHeight: 15, letterSpacing: 0 },
-    overline: { fontSize: 10.5, lineHeight: 13, letterSpacing: 0.8 },
+    hero: step(44, 46, -1.4),
+    display: step(30, 34, -0.8),
+    h1: step(22, 27, -0.5),
+    h2: step(18, 23, -0.35),
+    h3: step(16, 21, -0.2),
+    body: step(14, 20, -0.1),
+    bodySm: step(13, 18, -0.05),
+    caption: step(11.5, 15, 0),
+    overline: step(10.5, 13, 0.8),
   },
+
+  /**
+   * Spread onto a Text style so a line box measures the same on both
+   * platforms. Android's `includeFontPadding` is on by default and adds space
+   * the design never asked for.
+   */
+  textBase,
+
+  /** Exposed so a screen can make a considered exception. Prefer `type`. */
+  scale: { font: scaleFont, size: scaleSize, factor: deviceScale, isLargePhone },
 
   /** 4pt scale, tightened. `screen` is the horizontal page gutter. */
   space: {

@@ -40,6 +40,7 @@ import Superwall, {
 } from '@superwall/react-native-superwall';
 
 import { theme } from '../theme';
+import { refreshServerSubscription } from '../../app/helpers/ApiHelper';
 import { Check, ChevronRight, Lock } from '../components/ui/icons';
 
 /** Product IDs as configured in Play Console / App Store Connect. */
@@ -188,7 +189,24 @@ const PaywallScreen = ({ navigation, route }: any) => {
     [plans, selected],
   );
 
-  const finish = useCallback(() => {
+  /**
+   * Tell the server before leaving.
+   *
+   * The SDK already knows the purchase succeeded, but the server keeps its
+   * own flag in redis that only the RevenueCat webhook writes. Without this
+   * call a member who has just paid goes back to a screen still serving
+   *  until that webhook lands. One POST closes the window.
+   *
+   * Awaited, but never allowed to block the exit — a slow or failed refresh
+   * must not trap someone on the paywall they have already paid on.
+   */
+  const finish = useCallback(async () => {
+    try {
+      const appUserId = await Purchases.getAppUserID();
+      await refreshServerSubscription(navigation, appUserId);
+    } catch (e) {
+      // The webhook remains the backstop.
+    }
     route?.params?.onSuccess?.();
     navigation.goBack();
   }, [navigation, route]);
