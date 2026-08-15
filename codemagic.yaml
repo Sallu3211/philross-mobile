@@ -49,26 +49,52 @@ workflows:
           xcode-project use-profiles --project ios/philross.xcodeproj --warn-only
       - name: Increment build number
         script: |
-          # The old one-liner was:
-          #   agvtool new-version -all $(($(app-store-connect \
-          #     get-latest-testflight-build-number "$BUNDLE_ID") + 1))
-          # If that lookup returns nothing, $(( + 1)) evaluates to 1, and build 1
-          # already exists — App Store Connect then rejects the upload with
-          # "includes an attribute with a value that has already been used".
+          # Apple rejects an upload whose build number has been seen before,
+          # with "includes an attribute with a value that has already been
+          # used". Getting this number right is the whole job.
           #
-          # Ask by App Store app id (highest build across ALL versions, which is
-          # what Apple requires to increase), fall back to the TestFlight lookup,
-          # and only then to 0.
+          # Two earlier versions both got it wrong:
+          #
+          #   1. `$(($(get-latest-testflight-build-number) + 1))` — when the
+          #      lookup returned nothing, $(( + 1)) evaluated to 1, and build 1
+          #      already existed.
+          #
+          #   2. Preferring get-latest-app-store-build-number and only falling
+          #      back to TestFlight. That reads the latest *released* build,
+          #      which is behind TestFlight whenever there are unreleased
+          #      builds — so it proposed a number TestFlight had already used.
+          #
+          # Both lookups are asked, and the HIGHER wins. A fallback that is
+          # merely "some number" is not good enough; it has to beat everything
+          # Apple has ever seen for this app.
           cd ios
-          LATEST=$(app-store-connect get-latest-app-store-build-number "$APP_STORE_APP_ID" 2>/dev/null || true)
-          if ! echo "$LATEST" | grep -qE '^[0-9]+$'; then
-            LATEST=$(app-store-connect get-latest-testflight-build-number "$BUNDLE_ID" 2>/dev/null || true)
+
+          APP_STORE_LATEST=$(app-store-connect get-latest-app-store-build-number "$APP_STORE_APP_ID" 2>/dev/null | tr -dc '0-9')
+          TESTFLIGHT_LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APP_ID" 2>/dev/null | tr -dc '0-9')
+
+          echo "App Store reports: '${APP_STORE_LATEST:-none}'"
+          echo "TestFlight reports: '${TESTFLIGHT_LATEST:-none}'"
+
+          LATEST=0
+          for candidate in "$APP_STORE_LATEST" "$TESTFLIGHT_LATEST"; do
+            if echo "$candidate" | grep -qE '^[0-9]+$' && [ "$candidate" -gt "$LATEST" ]; then
+              LATEST="$candidate"
+            fi
+          done
+
+          if [ "$LATEST" -eq 0 ]; then
+            # Neither lookup answered — a network blip, a permissions change, a
+            # renamed app. Incrementing from zero would collide with whatever
+            # is really up there, so use the clock instead: YYMMDDHHMM always
+            # increases and cannot repeat. The next build reads it back through
+            # the lookups above and carries on from there.
+            NEW=$(date +%y%m%d%H%M)
+            echo "Neither lookup answered — falling back to timestamp $NEW"
+          else
+            NEW=$((LATEST + 1))
+            echo "Highest build Apple knows: $LATEST -> using $NEW"
           fi
-          if ! echo "$LATEST" | grep -qE '^[0-9]+$'; then
-            LATEST=0
-          fi
-          NEW=$((LATEST + 1))
-          echo "Latest build number seen: $LATEST -> using $NEW"
+
           agvtool new-version -all "$NEW"
       - name: Build ipa for App Store distribution
         script: |
