@@ -13,7 +13,6 @@ import {
   ScrollView,
   StatusBar,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -22,7 +21,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CommonActions } from '@react-navigation/native';
 import DeviceInfo from 'react-native-device-info';
-import EncryptedStorage from 'react-native-encrypted-storage';
 
 import { useUser } from '../context/UserContext';
 import { theme } from '../theme';
@@ -32,15 +30,12 @@ import {
   updateProfile,
 } from '../../app/helpers/ApiHelper';
 import {
-  Bell,
   Check,
   ChevronRight,
   Info,
   Lock,
   IconProps,
 } from '../components/ui/icons';
-
-const NOTIF_PREF_KEY = 'pref_push_notifications';
 
 interface RowProps {
   icon: React.FC<IconProps>;
@@ -86,7 +81,6 @@ const ProfileScreen = ({ navigation }: any) => {
   const [fullName, setFullName] = useState('');
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
-  const [notifications, setNotifications] = useState(true);
 
   /* Seed the form from whatever we already know, then refresh from the API. */
   useEffect(() => {
@@ -95,9 +89,6 @@ const ProfileScreen = ({ navigation }: any) => {
 
   useEffect(() => {
     (async () => {
-      const pref = await EncryptedStorage.getItem(NOTIF_PREF_KEY).catch(() => null);
-      if (pref !== null) setNotifications(pref === 'true');
-
       // The server is the source of truth for the name. When the profile
       // endpoint exists, whatever it returns overwrites both the field and
       // the cached user — so a name changed on another device shows up here,
@@ -166,11 +157,6 @@ const ProfileScreen = ({ navigation }: any) => {
       setSaving(false);
     }
   }, [fullName, navigation, setUser, user]);
-
-  const onToggleNotifications = useCallback(async (next: boolean) => {
-    setNotifications(next);
-    await EncryptedStorage.setItem(NOTIF_PREF_KEY, String(next)).catch(() => {});
-  }, []);
 
   const onLogout = useCallback(async () => {
     Alert.alert('Log out', 'Are you sure you want to log out?', [
@@ -302,22 +288,6 @@ const ProfileScreen = ({ navigation }: any) => {
         {/* Preferences */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Preferences</Text>
-          <Row
-            icon={Bell}
-            label="Push notifications"
-            tint={theme.color.status.info}
-            right={
-              <Switch
-                value={notifications}
-                onValueChange={onToggleNotifications}
-                trackColor={{
-                  false: theme.color.neutral[300],
-                  true: theme.color.accent.base,
-                }}
-                thumbColor={theme.color.surface.card}
-              />
-            }
-          />
           <Row
             icon={Lock}
             label="Change password"

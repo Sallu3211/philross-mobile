@@ -14,7 +14,7 @@ import SideMenu from '../components/SideMenu';
 import { theme } from '../theme';
 import ScreenHeader from '../components/ui/ScreenHeader';
 import SearchBar from '../components/ui/SearchBar';
-import FilterChips from '../components/ui/FilterChips';
+import FilterDropdown from '../components/ui/FilterDropdown';
 import MediaListCard from '../components/ui/MediaListCard';
 import { EmptyState, LoadingState } from '../components/ui/StateView';
 import { Shop } from '../components/ui/icons';
@@ -28,13 +28,12 @@ const ProductsScreen = ({ navigation }: any) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMoreProducts, setHasMoreProducts] = useState(true);
-  const [categories, setCategories] = useState<any[]>([
-    { id: 'all', label: 'All Products', slug: 'all' },
-    { id: 'equipment', label: 'Equipment', slug: 'equipment' },
-    { id: 'apparel', label: 'Apparel', slug: 'apparel' },
-    { id: 'guides', label: 'Guides', slug: 'guides' },
-    { id: 'support', label: 'Support', slug: 'support' }
-  ]);
+  // Starts empty on purpose. The previous default listed Equipment / Apparel /
+  // Guides / Support, none of which exist on the server — picking one returned
+  // an empty list every time. A filter that cannot match anything is worse
+  // than no filter, so the control simply does not render until the real
+  // categories arrive.
+  const [categories, setCategories] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [, setIsLoadingCategories] = useState(false);
   const [, setIsSearching] = useState(false);
@@ -97,24 +96,10 @@ const ProductsScreen = ({ navigation }: any) => {
         
         setCategories(apiCategories);
       } else {
-        // Fallback to default categories if API fails
-        setCategories([
-          { id: 'all', label: 'All Products', slug: 'all' },
-          { id: 'equipment', label: 'Equipment', slug: 'equipment' },
-          { id: 'apparel', label: 'Apparel', slug: 'apparel' },
-          { id: 'guides', label: 'Guides', slug: 'guides' },
-          { id: 'support', label: 'Support', slug: 'support' }
-        ]);
+        setCategories([]);
       }
     } catch (error) {
-      // Fallback to default categories on error
-      setCategories([
-        { id: 'all', label: 'All Products', slug: 'all' },
-        { id: 'equipment', label: 'Equipment', slug: 'equipment' },
-        { id: 'apparel', label: 'Apparel', slug: 'apparel' },
-        { id: 'guides', label: 'Guides', slug: 'guides' },
-        { id: 'support', label: 'Support', slug: 'support' }
-      ]);
+      setCategories([]);
     } finally {
       setIsLoadingCategories(false);
     }
@@ -237,39 +222,37 @@ const ProductsScreen = ({ navigation }: any) => {
     }
   };
 
-  // Handle product click - open external link
-  const handleProductClick = async (product: any) => {
-    try {
-            if (product.destination_link) {
-        // Open external link in new tab/browser
-        const supported = await Linking.canOpenURL(product.destination_link);
-        
-        if (supported) {
-          await Linking.openURL(product.destination_link);
-        } else {
-          Alert.alert(
-            'Link Error',
-            'Cannot open this link. Please try again later.',
-            [{ text: 'OK' }]
-          );
-        }
-      } else {
-        Alert.alert(
-          'No Link Available',
-          'This product does not have a purchase link yet.',
-        [{ text: 'OK' }]
-        );
-      }
-    } catch (error) {
-      Alert.alert(
-        'Error',
-        'Failed to open product link. Please try again.',
-        [{ text: 'OK' }]
-      );
+  /**
+   * Tapping a product now opens its page in the app.
+   *
+   * It used to fire straight out to Amazon or Stripe. That gave the shopper no
+   * chance to read the description, no price in context, no share, and no way
+   * to ring Phil before buying — and it dropped them into a browser from a
+   * single tap, which reads as the app breaking rather than a link opening.
+   * The detail screen carries the buy button; leaving is now a second,
+   * deliberate tap.
+   */
+  const handleProductClick = (product: any) => {
+    const slug = product?.slug ?? product?.id;
+
+    if (slug) {
+      navigation.navigate('ProductDetails', { productSlug: String(slug) });
+      return;
     }
+
+    // No slug means the detail endpoint has nothing to look up. Falling back
+    // to the old behaviour beats a dead tap.
+    if (product?.destination_link) {
+      Linking.openURL(product.destination_link).catch(() =>
+        Alert.alert('Link Error', 'Cannot open this link. Please try again later.'),
+      );
+      return;
+    }
+
+    Alert.alert('Unavailable', 'This product does not have a page yet.');
   };
 
-  const chipOptions = categories
+  const categoryOptions = categories
     .filter((c: any) => (c?.id ?? c?.slug) !== 'all')
     .map((c: any) => ({
       id: String(c?.id ?? c?.slug),
@@ -277,10 +260,12 @@ const ProductsScreen = ({ navigation }: any) => {
     }));
 
   const selectCategory = (id: string) => {
-    const next = selectedCategory === id ? 'all' : id;
-    setSelectedCategory(next);
+    // The dropdown reports its own "all" row, so there is no toggle-off case
+    // to second-guess here — whatever it says is the new selection.
+    setSelectedCategory(id);
     setCurrentPage(1);
-    fetchProducts(1, false, next);
+    setProducts([]);
+    fetchProducts(1, false, id);
   };
 
   const money = (value: unknown): string | null => {
@@ -302,25 +287,32 @@ const ProductsScreen = ({ navigation }: any) => {
         onMenu={() => setShowSideMenu(true)}
       />
 
-      <View style={styles.searchWrap}>
+      {/* Search and filter share one row and one baseline. They used to be two
+          stacked bands at different widths — the search inset by the screen
+          padding, the chips scrolling edge to edge — which is the misalignment
+          that was reported. Both now sit inside the same padded row and both
+          are 46pt tall, so their tops and bottoms line up exactly. */}
+      <View style={styles.controls}>
         <SearchBar
           value={searchQuery}
           onChangeText={handleSearchInputChange}
           onSubmit={handleSearch}
           placeholder="Search books and gear"
+          style={styles.search}
         />
-      </View>
 
-      {chipOptions.length > 0 && (
-        <FilterChips
-          options={chipOptions}
-          selected={selectedCategory === 'all' ? [] : [selectedCategory]}
-          onToggle={selectCategory}
-          onClear={() => selectCategory('all')}
-          allLabel="All"
-          style={styles.chips}
-        />
-      )}
+        {categoryOptions.length > 0 && (
+          <FilterDropdown
+            options={categoryOptions}
+            selected={selectedCategory}
+            onSelect={selectCategory}
+            allLabel="All products"
+            placeholder="Filter"
+            title="Category"
+            style={styles.filter}
+          />
+        )}
+      </View>
 
       {isLoading && products.length === 0 ? (
         <LoadingState label="Loading products" />
@@ -362,8 +354,10 @@ const ProductsScreen = ({ navigation }: any) => {
           }
           renderItem={({ item }: any) => (
             <MediaListCard
-              title={item?.title ?? 'Untitled'}
-              body={item?.headline ?? item?.description}
+              // The API has no `title` field — the model calls it `headline`.
+              // Reading `title` meant every card in the list said "Untitled".
+              title={item?.headline ?? item?.title ?? 'Untitled'}
+              body={item?.description}
               imageUrl={item?.cropped_image_url}
               // Product shots are portrait; cropping them cuts the tops off.
               imageFit="contain"
@@ -385,11 +379,17 @@ const ProductsScreen = ({ navigation }: any) => {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.color.surface.app },
-  searchWrap: {
+  controls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space.md,
     paddingHorizontal: theme.space.screen,
-    paddingBottom: theme.space.md,
+    paddingBottom: theme.space.lg,
   },
-  chips: { marginBottom: theme.space.md },
+  /** Takes the row; minWidth:0 lets it actually shrink beside the filter. */
+  search: { flex: 1, minWidth: 0 },
+  /** Wide enough for "Fitness Equipment" without stealing the search field. */
+  filter: { width: 132 },
   list: {
     paddingHorizontal: theme.space.screen,
     paddingBottom: theme.space['5xl'],

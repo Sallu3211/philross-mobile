@@ -17,6 +17,7 @@ import { theme } from '../theme';
 import ScreenHeader from '../components/ui/ScreenHeader';
 import { Check } from '../components/ui/icons';
 import { submitIntakeForm } from '../../app/helpers/ApiHelper';
+import ThankYouModal from '../components/ui/ThankYouModal';
 import { countryCodes, phoneLengthRules } from '../data/countryCodes';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -66,6 +67,7 @@ const IntakeFormScreen = ({ navigation }: any) => {
 
   const [errors, setErrors] = useState<Errors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [sent, setSent] = useState(false);
 
   const clearError = (field: keyof Errors) =>
     setErrors(prev => (prev[field] ? { ...prev, [field]: undefined } : prev));
@@ -104,7 +106,20 @@ const IntakeFormScreen = ({ navigation }: any) => {
       const response = await submitIntakeForm(
         {
           phone_number: `${detectCountryCode(phoneNumber)}${extractPhoneNumber(phoneNumber)}`,
-          training_days: availability,
+          // A comma-separated string of the model's own codes, not an array
+          // of the labels shown on screen. Two things were wrong before:
+          //
+          //   - The request goes out as multipart, and axios serialises an
+          //     array into "training_days[0]", "training_days[1]". Django
+          //     never sees a key called "training_days", so the days arrived
+          //     empty — a coaching lead with no availability on it, which is
+          //     the one field the callback depends on.
+          //   - The values sent were the button labels ("Mon"), while the
+          //     model's choices are lowercase ("mon").
+          //
+          // The serializer accepts a plain string for this field, so one is
+          // sent. `.toLowerCase()` on the labels yields exactly the codes.
+          training_days: availability.map(d => d.toLowerCase()).join(','),
           city: city.trim(),
           state: state.trim(),
           training_mode:
@@ -117,9 +132,10 @@ const IntakeFormScreen = ({ navigation }: any) => {
       );
 
       if (response?.status || response?.success) {
-        // The confirmation screen says the same thing with more room, so
-        // there is no Alert in between.
-        navigation.replace('ApplicationConfirmation');
+        // A dialog over the form they just filled in, rather than replacing
+        // the screen. It answers the submit directly, and its one button is
+        // the only way out — so the form cannot be sent a second time.
+        setSent(true);
       } else {
         Alert.alert(
           'Not sent',
@@ -343,6 +359,23 @@ const IntakeFormScreen = ({ navigation }: any) => {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      <ThankYouModal
+        visible={sent}
+        title="Thank you"
+        body={
+          "Your application is with Master Phil's team. They will review your " +
+          'details and get back to you within 24 to 48 hours to build your ' +
+          'coaching plan.'
+        }
+        actionLabel="Back to dashboard"
+        // `navigate`, not `replace`: the form is still mounted underneath and
+        // must not be left on the stack for the back gesture to return to.
+        onAction={() => {
+          setSent(false);
+          navigation.navigate('Dashboard');
+        }}
+      />
     </SafeAreaView>
   );
 };

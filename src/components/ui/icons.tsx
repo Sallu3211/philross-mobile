@@ -67,6 +67,15 @@ export const ChevronRight: Icon = ({ size, color = INK }) => (
   </Base>
 );
 
+export const ChevronDown: Icon = ({ size, color = INK }) => (
+  <Base size={size}>
+    <Path
+      d="M4.3 9.3a1.5 1.5 0 012.1 0L12 14.9l5.6-5.6a1.5 1.5 0 112.1 2.1l-6.6 6.7a1.5 1.5 0 01-2.2 0L4.3 11.4a1.5 1.5 0 010-2.1z"
+      fill={color}
+    />
+  </Base>
+);
+
 export const Bell: Icon = ({ size, color = INK }) => (
   <Base size={size}>
     <Path

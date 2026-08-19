@@ -20,8 +20,10 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { theme } from '../theme';
 import ScreenHeader from '../components/ui/ScreenHeader';
 import { ErrorState, LoadingState } from '../components/ui/StateView';
-import { Close, Copy, Share, Shop } from '../components/ui/icons';
+import { Close, Copy, Phone, Share, Shop } from '../components/ui/icons';
 import { getProductDetail } from '../../app/helpers/ApiHelper';
+import { isEmbeddableCheckout } from './CheckoutScreen';
+import getContactInfo, { dialable, FALLBACK_PHONE } from '../services/contactInfo';
 import FbIcon from '../../assets/icons/facebook.png';
 import WhatsAppIcon from '../../assets/icons/whatsapp.png';
 import InstagramIcon from '../../assets/icons/instagram.png';
@@ -60,6 +62,18 @@ const ProductDetailsScreen = ({ route, navigation }: any) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showShare, setShowShare] = useState(false);
+  const [phone, setPhone] = useState(FALLBACK_PHONE);
+
+  // Fetched once per mount; the service caches, so revisiting is free.
+  useEffect(() => {
+    let alive = true;
+    getContactInfo().then(info => {
+      if (alive) setPhone(info.phone);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const fetchProductDetails = useCallback(async () => {
     if (!productSlug) {
@@ -99,17 +113,61 @@ const ProductDetailsScreen = ({ route, navigation }: any) => {
     ? `https://philrossapp.link/product/${productData.slug}`
     : 'https://philrossapp.link';
 
+  /**
+   * Stripe stays in the app; everything else goes to the browser.
+   *
+   * The split is deliberate, not a shortcut. Phil's Stripe payment links are a
+   * single self-contained page, so keeping them inside means the shopper never
+   * leaves. Amazon and the other shops are not: they want the browser's saved
+   * logins and addresses, and Amazon actively degrades inside a WebView.
+   */
   const handleShopNow = async () => {
     const link = productData?.destination_link;
     if (!link) {
       Alert.alert('Unavailable', 'This product has no shop link yet.');
       return;
     }
+
+    if (isEmbeddableCheckout(link)) {
+      navigation.navigate('Checkout', {
+        url: link,
+        title: plain(productData?.headline) || 'Checkout',
+      });
+      return;
+    }
+
     try {
       await Linking.openURL(link);
     } catch (e) {
       Alert.alert('Unavailable', 'We could not open the shop link.');
     }
+  };
+
+  /**
+   * Ring Phil about this product.
+   *
+   * Several items are priced but not straightforwardly buyable online — bulk
+   * kettlebell orders, the 1-on-1 certification — and the client asked for a
+   * way to speak to someone before paying. The product's name goes nowhere
+   * over a phone line, so the alert names it: whoever answers should not have
+   * to ask what the caller is ringing about.
+   */
+  const handleCall = () => {
+    const name = plain(productData?.headline) || 'this product';
+    Alert.alert(
+      'Call about this product',
+      `Call Phil on ${phone} about "${name}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Call',
+          onPress: () =>
+            Linking.openURL(`tel:${dialable(phone)}`).catch(() =>
+              Alert.alert('Unavailable', 'This device cannot place calls.'),
+            ),
+        },
+      ],
+    );
   };
 
   const handleSocialShare = async (platform: string) => {
@@ -218,13 +276,30 @@ const ProductDetailsScreen = ({ route, navigation }: any) => {
               { paddingBottom: Math.max(insets.bottom, theme.space.lg) },
             ]}
           >
+            {/* Call sits to the left as an icon: present for anyone who wants
+                it, without competing with the action most people came for. */}
+            <TouchableOpacity
+              style={styles.callBtn}
+              onPress={handleCall}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={`Call Phil on ${phone} about this product`}
+            >
+              <Phone size={18} color={theme.color.text.primary} />
+              <Text style={styles.callText}>Call</Text>
+            </TouchableOpacity>
+
             <TouchableOpacity
               style={styles.cta}
               onPress={handleShopNow}
               activeOpacity={0.9}
               accessibilityRole="button"
             >
-              <Text style={styles.ctaText}>Shop now</Text>
+              <Text style={styles.ctaText}>
+                {isEmbeddableCheckout(productData?.destination_link)
+                  ? 'Buy now'
+                  : 'Shop now'}
+              </Text>
             </TouchableOpacity>
           </View>
         </>
@@ -356,13 +431,36 @@ const styles = StyleSheet.create({
   },
 
   bar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space.md,
     paddingHorizontal: theme.space.screen,
     paddingTop: theme.space.md,
     backgroundColor: theme.color.surface.card,
     borderTopWidth: 1,
     borderTopColor: theme.color.border.subtle,
   },
+  /** Fixed width, so the buy button's size does not move with it. */
+  callBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    width: 96,
+    minHeight: 52,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.color.border.strong,
+    backgroundColor: theme.color.surface.app,
+  },
+  callText: {
+    fontFamily: theme.font.semibold,
+    fontSize: theme.type.bodySm.fontSize,
+    color: theme.color.text.primary,
+    includeFontPadding: false,
+  },
   cta: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 52,

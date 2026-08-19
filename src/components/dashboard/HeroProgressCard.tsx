@@ -61,7 +61,7 @@ const AVAILABLE = CONTENT_W - GAP;
  * is no width at which it can crowd the text out or spill past the padding.
  */
 const RING = Math.floor(
-  Math.max(68, Math.min(88, AVAILABLE * 0.25, AVAILABLE * 0.4)),
+  Math.max(74, Math.min(96, AVAILABLE * 0.28, AVAILABLE * 0.4)),
 );
 
 export interface HeroProgressCardProps {

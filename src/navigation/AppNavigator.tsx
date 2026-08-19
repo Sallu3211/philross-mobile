@@ -1,6 +1,5 @@
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
-import { useUser } from '../context/UserContext';
 import SplashScreen from '../screens/SplashScreen';
 import LoginScreen from '../screens/LoginScreen';
 import SignUpScreen from '../screens/SignUpScreen';
@@ -16,6 +15,7 @@ import CoursesScreen from '../screens/CoursesScreen';
 import CourseDetailsScreen from '../screens/CourseDetailsScreen';
 import EventDetailsScreen from '../screens/EventDetailsScreen';
 import ProductDetailsScreen from '../screens/ProductDetailsScreen';
+import CheckoutScreen from '../screens/CheckoutScreen';
 import FeedDetailsScreen from '../screens/FeedDetailsScreen';
 import IntakeFormScreen from '../screens/IntakeFormScreen';
 import ApplicationConfirmationScreen from '../screens/ApplicationConfirmationScreen';
@@ -33,15 +33,18 @@ import NewPasswordScreen from '../screens/NewPasswordScreen';
 const Stack = createStackNavigator();
 
 const AppNavigator = () => {
-  const { isLoggedIn, isLoading } = useUser();
-
-  // Determine initial route based on login status.
-  // Logged-in members land on the Dashboard; Feed is still reachable from it.
-  // To revert the home screen, change 'Dashboard' back to 'Feed' here.
-  const getInitialRoute = () => {
-    if (isLoading) return 'Splash';
-    return isLoggedIn ? 'Dashboard' : 'Splash';
-  };
+  /**
+   * Every launch starts on Splash, signed in or not.
+   *
+   * It used to send a signed-in member straight to the Dashboard, which meant
+   * the opening artwork was only ever seen by people who were logged out — for
+   * a returning member, the brand moment of the app did not exist. Splash
+   * already resolves the session and forwards to Dashboard or Login itself
+   * (see SplashScreen), so routing around it was duplicating that decision in
+   * two places as well as skipping the screen. The session is no longer read
+   * here at all — one place decides, and it is the screen that waits for it.
+   */
+  const getInitialRoute = () => 'Splash';
 
   return (
       <Stack.Navigator
@@ -68,6 +71,7 @@ const AppNavigator = () => {
         <Stack.Screen name="CourseDetails" component={CourseDetailsScreen} />
         <Stack.Screen name="EventDetails" component={EventDetailsScreen} />
         <Stack.Screen name="ProductDetails" component={ProductDetailsScreen} />
+        <Stack.Screen name="Checkout" component={CheckoutScreen} />
         <Stack.Screen name="FeedDetails" component={FeedDetailsScreen} />
         <Stack.Screen name="CoachDetails" component={CoachDetailsScreen} />
         <Stack.Screen name="IntakeForm" component={IntakeFormScreen} />

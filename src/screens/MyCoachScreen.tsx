@@ -295,10 +295,20 @@ const styles = StyleSheet.create({
     paddingBottom: theme.space['4xl'],
   },
 
+  /**
+   * 3:2, not 4:5.
+   *
+   * The frame was portrait while the source image is cropped 16:9 landscape on
+   * the server (`main_image_crop = "800x450"`). A portrait frame with `cover`
+   * therefore threw away most of the width and enlarged what was left — which
+   * is both why it filled the screen and why it read as too big. 3:2 is close
+   * enough to the real crop to keep the subject, and drops the frame from
+   * roughly 415pt tall to 220pt on a 360dp phone.
+   */
   hero: {
     width: '100%',
-    aspectRatio: 4 / 5,
-    maxHeight: 420,
+    aspectRatio: 3 / 2,
+    maxHeight: 280,
     borderRadius: 20,
     overflow: 'hidden',
     backgroundColor: theme.color.surface.hero,

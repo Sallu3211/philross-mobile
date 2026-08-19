@@ -110,7 +110,13 @@ export const ProgressRing: React.FC<ProgressRingProps> = ({
         </G>
       </Svg>
 
-      <View style={styles.center} pointerEvents="none">
+      {/* Inset by the stroke plus a little air, so the label and caption can
+          never sit against the ring. "complete" was touching the arc on the
+          smaller rings, which read as a rendering fault rather than a gap. */}
+      <View
+        style={[styles.center, { padding: strokeWidth + size * 0.08 }]}
+        pointerEvents="none"
+      >
         {children ?? (
           <>
             {label !== null && (
@@ -125,7 +131,17 @@ export const ProgressRing: React.FC<ProgressRingProps> = ({
               </Text>
             )}
             {!!caption && (
-              <Text style={[styles.caption, { color: captionColor }]} numberOfLines={1}>
+              <Text
+                style={[
+                  styles.caption,
+                  // Scales with the ring. A fixed size fits a 92pt ring and
+                  // crowds a 68pt one.
+                  { color: captionColor, fontSize: Math.max(9, size * 0.13) },
+                ]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                allowFontScaling={false}
+              >
                 {caption}
               </Text>
             )}
@@ -153,7 +169,6 @@ const styles = StyleSheet.create({
   },
   caption: {
     fontFamily: theme.font.medium,
-    fontSize: theme.type.caption.fontSize,
     marginTop: 1,
   },
 });

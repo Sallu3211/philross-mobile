@@ -102,7 +102,11 @@ const ContactScreen = ({ navigation }: any) => {
     fetchContactData();
   }, [fetchContactData]);
 
-  const phone = contactInfo?.phone || FALLBACK_PHONE;
+  // The endpoint's field is `phone_number`. Reading only `phone` meant this
+  // fell through to the constant on every load — invisible only because the
+  // two values happened to be identical. Both keys are accepted so it stays
+  // correct if either side is renamed.
+  const phone = contactInfo?.phone_number || contactInfo?.phone || FALLBACK_PHONE;
   const email = contactInfo?.email || FALLBACK_EMAIL;
 
   const copy = (value: string, what: string) => {
