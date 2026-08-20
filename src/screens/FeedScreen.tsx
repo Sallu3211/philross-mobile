@@ -5,8 +5,6 @@ import {
   RefreshControl,
   StatusBar,
   StyleSheet,
-  Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,10 +12,10 @@ import SideMenu from '../components/SideMenu';
 import { theme } from '../theme';
 import ScreenHeader from '../components/ui/ScreenHeader';
 import SearchBar from '../components/ui/SearchBar';
-import FilterChips from '../components/ui/FilterChips';
+import FilterDropdown from '../components/ui/FilterDropdown';
 import MediaListCard from '../components/ui/MediaListCard';
 import { EmptyState, ErrorState, LoadingState } from '../components/ui/StateView';
-import { Check, Filter, Info, Play } from '../components/ui/icons';
+import { Check, Info, Play } from '../components/ui/icons';
 import { getFeedCategories, getWorkoutTypes, getFeedList } from '../../app/helpers/ApiHelper';
 import EncryptedStorage from 'react-native-encrypted-storage';
 import { pushCleverTapEvent } from '../../App';
@@ -34,7 +32,6 @@ const FeedScreen = ({ navigation }: any) => {
   const [categories, setCategories] = useState<any[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [, setIsLoadingCategories] = useState(false);
-  const [showFilter, setShowFilter] = useState(false);
   
   // New state for workout types and feed data
   const [workoutTypes, setWorkoutTypes] = useState<any[]>([]);
@@ -203,56 +200,48 @@ const FeedScreen = ({ navigation }: any) => {
   };
 
   // Handle category selection (multiple selection)
-  const handleCategorySelect = (category: any) => {
-    const categoryName = category.name || category;
-
-    if (categoryName === 'Athlete') {
-      pushCleverTapEvent('athlete_selected', {});
-    }
-    if (categoryName === 'Coach') {
-      pushCleverTapEvent('coach_selected', {});
-    }
-    
-    setSelectedCategories(prev => {
-      if (prev.includes(categoryName)) {
-        return prev.filter(cat => cat !== categoryName);
-      } else {
-        return [...prev, categoryName];
-      }
-    });
-  };
-
-  // Handle workout type selection
-  const handleWorkoutTypeSelect = (workoutType: string) => {
-    setSelectedWorkoutTypes(prev => {
-      if (prev.includes(workoutType)) {
-        return prev.filter(type => type !== workoutType);
-      } else {
-        return [...prev, workoutType];
-      }
-    });
+  /**
+   * The two audience categories the client tracks.
+   *
+   * These used to fire as each chip was tapped. With an Apply step, a tap is
+   * only a candidate — reporting it then would count selections nobody ever
+   * committed to, so they are reported when the filter is applied instead.
+   */
+  const reportCategorySelections = (names: string[]) => {
+    if (names.includes('Athlete')) pushCleverTapEvent('athlete_selected', {});
+    if (names.includes('Coach')) pushCleverTapEvent('coach_selected', {});
   };
 
   // Apply filters and fetch filtered data
-  const applyFilters = async () => {
+  /**
+   * Takes the selections as arguments rather than reading state.
+   *
+   * The filter sheet hands over what was ticked at the moment Apply is
+   * pressed. Reading state here instead would fetch with the *previous*
+   * selection, because the setState calls beside this one have not landed yet.
+   * State is still the default, for any caller that has already updated it.
+   */
+  const applyFilters = async (
+    cats: string[] = selectedCategories,
+    types: string[] = selectedWorkoutTypes,
+  ) => {
     // Convert workout type names to IDs for the API
-    const workoutTypeIds = selectedWorkoutTypes.map(typeName => {
+    const workoutTypeIds = types.map(typeName => {
       const workoutType = workoutTypes.find(wt => wt.name === typeName);
       return workoutType ? workoutType.id : null;
     }).filter(id => id !== null);
-    
+
     // Convert category names to IDs for the API
-    const categoryIds = selectedCategories.map(categoryName => {
+    const categoryIds = cats.map(categoryName => {
       const category = categories.find(cat => (cat.name || cat) === categoryName);
       return category ? category.id : null;
     }).filter(id => id !== null);
-    
+
     setFeedError(null); // Clear any previous errors
     await fetchFeedData({ 
       workout_type: workoutTypeIds,
       category: categoryIds.length > 0 ? categoryIds.join(',') : ''
     });
-    setShowFilter(false);
   };
 
   const onItemPress = async (item: any) => {
@@ -321,84 +310,56 @@ const FeedScreen = ({ navigation }: any) => {
             : undefined
         }
         onMenu={() => setShowSideMenu(true)}
-        right={
-          (categoryOptions.length > 0 || workoutOptions.length > 0) && (
-            <TouchableOpacity
-              style={[styles.filterBtn, filterCount > 0 && styles.filterBtnOn]}
-              onPress={() => setShowFilter(v => !v)}
-              hitSlop={theme.hitSlop}
-              accessibilityRole="button"
-              accessibilityLabel="Filters"
-            >
-              <Filter
-                size={17}
-                color={
-                  filterCount > 0
-                    ? theme.color.text.inverse
-                    : theme.color.text.primary
-                }
-              />
-              {filterCount > 0 && (
-                <View style={styles.filterCount}>
-                  <Text style={styles.filterCountText}>{filterCount}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          )
-        }
       />
 
-      <View style={styles.searchWrap}>
+      {/* Search and filter share one row and one baseline — the same control
+          as Books & Gear and Workouts. The filter opens a sheet holding both
+          groups, so nothing is pushed off the top of the list and no chip row
+          scrolls its own options out of sight.
+
+          Multi-select with an Apply, deliberately: these filters are meant to
+          narrow. Ticking Kettlebell and then Beginner should leave what is
+          both, and applying on every tap would fire a request per tick. */}
+      <View style={styles.controls}>
         <SearchBar
           value={search}
           onChangeText={setSearch}
           placeholder="Search tutorials"
+          style={styles.search}
         />
+
+        {(categoryOptions.length > 0 || workoutOptions.length > 0) && (
+          <FilterDropdown
+            mode="multi"
+            title="Filters"
+            placeholder="Filter"
+            applyLabel="Apply filters"
+            style={styles.filterBtn}
+            groups={[
+              ...(categoryOptions.length > 0
+                ? [{ key: 'category', label: 'Category', options: categoryOptions }]
+                : []),
+              ...(workoutOptions.length > 0
+                ? [{ key: 'workout', label: 'Workout type', options: workoutOptions }]
+                : []),
+            ]}
+            selected={{
+              category: selectedCategories,
+              workout: selectedWorkoutTypes,
+            }}
+            onApply={next => {
+              const cats = next.category ?? [];
+              const types = next.workout ?? [];
+              setSelectedCategories(cats);
+              setSelectedWorkoutTypes(types);
+              reportCategorySelections(cats);
+              // Passed through rather than read back from state, which has
+              // not updated yet at this point.
+              applyFilters(cats, types);
+            }}
+          />
+        )}
       </View>
-
-      {/* Filters stay collapsed until asked for — two chip rows above every
-          list pushed the content itself off the first screen. */}
-      {showFilter && (
-        <View style={styles.filters}>
-          {categoryOptions.length > 0 && (
-            <>
-              <Text style={styles.filterLabel}>Category</Text>
-              <FilterChips
-                options={categoryOptions}
-                selected={selectedCategories}
-                onToggle={id => handleCategorySelect({ name: id })}
-                onClear={() => setSelectedCategories([])}
-              />
-            </>
-          )}
-
-          {workoutOptions.length > 0 && (
-            <>
-              <Text style={styles.filterLabel}>Workout type</Text>
-              <FilterChips
-                options={workoutOptions}
-                selected={selectedWorkoutTypes}
-                onToggle={handleWorkoutTypeSelect}
-                onClear={() => setSelectedWorkoutTypes([])}
-              />
-            </>
-          )}
-
-          <View style={styles.filterActions}>
-            <TouchableOpacity
-              style={styles.applyBtn}
-              onPress={() => {
-                applyFilters();
-                setShowFilter(false);
-              }}
-              activeOpacity={0.88}
-              accessibilityRole="button"
-            >
-              <Text style={styles.applyText}>Apply filters</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
 
       {isLoadingFeed && feedData.length === 0 ? (
         <LoadingState label="Loading tutorials" />
@@ -497,75 +458,16 @@ const FeedScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.color.surface.app },
 
-  filterBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: theme.radius.md,
+  controls: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.color.surface.card,
-    borderWidth: 1,
-    borderColor: theme.color.border.subtle,
-  },
-  filterBtnOn: {
-    backgroundColor: theme.color.brand.base,
-    borderColor: theme.color.brand.base,
-  },
-  filterCount: {
-    position: 'absolute',
-    top: -3,
-    right: -3,
-    minWidth: 17,
-    height: 17,
-    paddingHorizontal: 4,
-    borderRadius: 9,
-    backgroundColor: theme.color.accent.base,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  filterCountText: {
-    fontFamily: theme.font.bold,
-    fontSize: 10,
-    color: theme.color.text.inverse,
-    includeFontPadding: false,
-  },
-
-  searchWrap: {
+    gap: theme.space.md,
     paddingHorizontal: theme.space.screen,
-    paddingBottom: theme.space.md,
+    paddingBottom: theme.space.lg,
   },
-  filters: {
-    backgroundColor: theme.color.surface.card,
-    marginHorizontal: theme.space.screen,
-    marginBottom: theme.space.lg,
-    borderRadius: theme.radius.lg,
-    paddingVertical: theme.space.lg,
-    gap: theme.space.sm,
-  },
-  filterLabel: {
-    fontFamily: theme.font.semibold,
-    fontSize: theme.type.overline.fontSize,
-    letterSpacing: theme.type.overline.letterSpacing,
-    textTransform: 'uppercase',
-    color: theme.color.text.muted,
-    paddingHorizontal: theme.space.screen,
-  },
-  filterActions: {
-    paddingHorizontal: theme.space.screen,
-    marginTop: theme.space.sm,
-  },
-  applyBtn: {
-    backgroundColor: theme.color.brand.base,
-    borderRadius: theme.radius.md,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  applyText: {
-    fontFamily: theme.font.semibold,
-    fontSize: theme.type.bodySm.fontSize,
-    color: theme.color.text.onBrand,
-  },
+  /** Takes the row; minWidth:0 lets it shrink beside the filter. */
+  search: { flex: 1, minWidth: 0 },
+  filterBtn: { width: 132 },
 
   list: {
     paddingHorizontal: theme.space.screen,

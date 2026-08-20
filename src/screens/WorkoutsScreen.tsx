@@ -33,8 +33,9 @@ import SideMenu from '../components/SideMenu';
 import { theme } from '../theme';
 import ScreenHeader from '../components/ui/ScreenHeader';
 import SearchBar from '../components/ui/SearchBar';
+import FilterDropdown from '../components/ui/FilterDropdown';
 import { EmptyState, ErrorState, LoadingState } from '../components/ui/StateView';
-import { Check, ChevronRight, Coach, Flame, Info } from '../components/ui/icons';
+import { ChevronRight, Coach, Flame, Info } from '../components/ui/icons';
 import { getWorkoutCategories } from '../../app/helpers/ApiHelper';
 
 interface Category {
@@ -194,44 +195,32 @@ const WorkoutsScreen = ({ navigation }: any) => {
             />
           }
         >
-          <SearchBar
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Find a category"
-            style={styles.search}
-          />
+          {/* Search and filter share one row and one baseline, the same
+              control the Books & Gear list uses. The counts move into the
+              sheet, where there is room to read them. */}
+          <View style={styles.controls}>
+            <SearchBar
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Find a category"
+              style={styles.search}
+            />
 
-          {/* Selectable, not only searchable. Twelve is a list you choose from,
-              not one you type into. */}
-          <View style={styles.filterRow}>
-            {[
-              { id: null, label: 'All', count: categories.length },
-              ...GROUPS.map(g => ({
+            <FilterDropdown
+              options={GROUPS.map(g => ({
                 id: g.key,
                 label: g.label,
                 count: categories.filter(c => c.group === g.key).length,
-              })),
-            ].map(f => {
-              const on = group === f.id;
-              return (
-                <TouchableOpacity
-                  key={String(f.id)}
-                  style={[styles.filter, on && styles.filterOn]}
-                  onPress={() => setGroup(f.id as Category['group'] | null)}
-                  activeOpacity={0.8}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: on }}
-                >
-                  {on && <Check size={11} color={theme.color.text.onBrand} />}
-                  <Text style={[styles.filterText, on && styles.filterTextOn]}>
-                    {f.label}
-                  </Text>
-                  <Text style={[styles.filterCount, on && styles.filterCountOn]}>
-                    {f.count}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+              }))}
+              selected={group ?? 'all'}
+              onSelect={id =>
+                setGroup(id === 'all' ? null : (id as Category['group']))
+              }
+              allLabel="All categories"
+              placeholder="Filter"
+              title="Group"
+              style={styles.filterBtn}
+            />
           </View>
 
           {visible.length === 0 ? (
@@ -285,13 +274,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.space.screen,
     paddingBottom: theme.space['5xl'],
   },
-  search: { marginBottom: theme.space.md },
-
-  filterRow: {
+  controls: {
     flexDirection: 'row',
-    gap: theme.space.sm,
+    alignItems: 'center',
+    gap: theme.space.md,
     marginBottom: theme.space.xl,
   },
+  /** Takes the row; minWidth:0 lets it shrink beside the filter. */
+  search: { flex: 1, minWidth: 0 },
+  filterBtn: { width: 132 },
   filter: {
     flexDirection: 'row',
     alignItems: 'center',

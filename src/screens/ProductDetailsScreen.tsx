@@ -247,9 +247,14 @@ const ProductDetailsScreen = ({ route, navigation }: any) => {
             {/* Product shots are portrait with their own white ground, so the
                 image is fitted whole on a soft panel rather than cropped. */}
             <View style={styles.imagePanel}>
-              {productData?.cropped_image_url ? (
+              {productData?.image_url || productData?.cropped_image_url ? (
                 <Image
-                  source={{ uri: productData.cropped_image_url }}
+                  source={{
+                    // Original in preference to the 16:9 crop — see the note
+                    // in ProductsScreen. The crop discards most of a portrait
+                    // product shot.
+                    uri: productData.image_url ?? productData.cropped_image_url,
+                  }}
                   style={styles.image}
                   resizeMode="contain"
                 />

@@ -396,8 +396,15 @@ const ProductsScreen = ({ navigation }: any) => {
               // Reading `title` meant every card in the list said "Untitled".
               title={item?.headline ?? item?.title ?? 'Untitled'}
               body={item?.description}
-              imageUrl={item?.cropped_image_url}
-              // Product shots are portrait; cropping them cuts the tops off.
+              // The uncropped original, not `cropped_image_url`. That one is
+              // generated to 800x450 from a crop box set in the admin, and the
+              // box is destructive here: the kettlebell shots are 853x1280 and
+              // it keeps y400-880, the book covers are 311x466 and it keeps
+              // y146-320. About three fifths of every portrait product is
+              // thrown away, which is why the artwork looked so zoomed in.
+              imageUrl={item?.image_url ?? item?.cropped_image_url}
+              // Fitted whole, on a white ground — a book cover with its title
+              // cropped off is not a book cover.
               imageFit="contain"
               price={money(item?.price)}
               onPress={() => handleProductClick(item)}
