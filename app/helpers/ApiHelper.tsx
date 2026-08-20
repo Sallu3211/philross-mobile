@@ -925,6 +925,12 @@ export const setFeedCompleted = async (
 // Products API Functions
 export const getProductList = async (navigation: any, params?: {
     page?: number;
+    /**
+     * Rows per page. The server's paginator reads `page_size`; it has never
+     * looked at `limit`, so the old `limit` param below was silently dropped
+     * and every request came back with the default 10.
+     */
+    page_size?: number;
     limit?: number;
     category?: string;
     search?: string;
@@ -943,6 +949,7 @@ export const getProductList = async (navigation: any, params?: {
                 if (params) {
                     const queryParams = new URLSearchParams();
                     if (params.page) queryParams.append('page', params.page.toString());
+                    if (params.page_size) queryParams.append('page_size', params.page_size.toString());
                     if (params.limit) queryParams.append('limit', params.limit.toString());
                     if (params.category) queryParams.append('category', params.category);
                     if (params.search) queryParams.append('search', params.search);

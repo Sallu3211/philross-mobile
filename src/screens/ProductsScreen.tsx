@@ -21,6 +21,13 @@ import { Shop } from '../components/ui/icons';
 import { getProductList, getProductCategories } from '../../app/helpers/ApiHelper';
 import { pushCleverTapEvent } from '../../App';
 
+/**
+ * Rows per request. The server's default is 10 and its ceiling is 100; asking
+ * for 50 fetches the whole catalogue in one round trip today while leaving
+ * pagination working if it grows.
+ */
+const PAGE_SIZE = 50;
+
 const ProductsScreen = ({ navigation }: any) => {
   const [showSideMenu, setShowSideMenu] = useState(false);
   const [products, setProducts] = useState<any[]>([]);
@@ -28,6 +35,8 @@ const ProductsScreen = ({ navigation }: any) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMoreProducts, setHasMoreProducts] = useState(true);
+  /** Total the server reports, which is not the number loaded so far. */
+  const [totalCount, setTotalCount] = useState(0);
   // Starts empty on purpose. The previous default listed Equipment / Apparel /
   // Guides / Support, none of which exist on the server — picking one returned
   // an empty list every time. A filter that cannot match anything is worse
@@ -116,7 +125,9 @@ const ProductsScreen = ({ navigation }: any) => {
       
       const params: any = {
         page: page,
-        limit: 20
+        // `page_size`, not `limit` — the server's paginator only reads the
+        // former. See the note in getProductList.
+        page_size: PAGE_SIZE,
       };
 
       if (searchQuery.trim()) {
@@ -130,13 +141,22 @@ const ProductsScreen = ({ navigation }: any) => {
       }
 
       const response = await getProductList(navigation, params);
-      
+
+      // The endpoint answers {count, next, previous, results}, but has shipped
+      // other shapes; unwrap a `data` envelope if one is there.
+      const body =
+        response?.results !== undefined
+          ? response
+          : response?.data?.results !== undefined
+            ? response.data
+            : response;
+
       // Parse products based on actual API response structure
       let newProducts: any[] = [];
-      
-      if (response?.results && Array.isArray(response.results)) {
-        // Structure: { count: 2, results: [...] }
-        newProducts = response.results;
+
+      if (body?.results && Array.isArray(body.results)) {
+        // Structure: { count: 19, next: ..., results: [...] }
+        newProducts = body.results;
       } else if (response?.data && Array.isArray(response.data)) {
         // Structure: { data: [...] }
         newProducts = response.data;
@@ -153,18 +173,34 @@ const ProductsScreen = ({ navigation }: any) => {
         // No valid data structure found in response
       }
       
+      if (typeof body?.count === 'number') setTotalCount(body.count);
+
       if (newProducts.length > 0) {
         if (append) {
           setProducts(prev => [...prev, ...newProducts]);
         } else {
           setProducts(newProducts);
         }
-        
-        setHasMoreProducts(newProducts.length === 20); // Assuming 20 is the page size
+
+        /**
+         * The server says whether there is another page; we no longer guess.
+         *
+         * This used to be `newProducts.length === 20`, paired with a request
+         * for `limit: 20` that the server ignored. It always came back with
+         * 10, 10 never equalled 20, so "there is more" was false after the
+         * very first page and the remaining nine products — including the
+         * Level 1 certification and most of the books — could not be reached
+         * by scrolling at all.
+         */
+        setHasMoreProducts(
+          body?.next != null ? true : newProducts.length >= PAGE_SIZE,
+        );
         setCurrentPage(page);
       } else {
+        setHasMoreProducts(false);
         if (!append) {
           setProducts([]);
+          setTotalCount(0);
         }
       }
     } catch (error) {
@@ -280,8 +316,10 @@ const ProductsScreen = ({ navigation }: any) => {
       <ScreenHeader
         title="Books & Gear"
         subtitle={
-          products.length > 0
-            ? `${products.length} ${products.length === 1 ? 'item' : 'items'}`
+          // The server's total, not how many have been scrolled into view —
+          // the header used to read "10 items" for a catalogue of nineteen.
+          totalCount > 0
+            ? `${totalCount} ${totalCount === 1 ? 'item' : 'items'}`
             : undefined
         }
         onMenu={() => setShowSideMenu(true)}
