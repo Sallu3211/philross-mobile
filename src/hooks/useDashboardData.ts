@@ -21,7 +21,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import EncryptedStorage from 'react-native-encrypted-storage';
 import Purchases from 'react-native-purchases';
-import { getCourseList, getFeedList } from '../../app/helpers/ApiHelper';
+import {
+  getCourseList,
+  getFeedList,
+  getServerSubscription,
+} from '../../app/helpers/ApiHelper';
 import type { ContinueItem } from '../components/dashboard/ContinueCard';
 import { exactPercent } from '../utils/percent';
 import {
@@ -100,11 +104,33 @@ async function readLocalCourseProgress(courseId: number | string): Promise<numbe
 }
 
 /**
- * Reads trial state straight from RevenueCat rather than tracking it ourselves.
- * `periodType === 'TRIAL'` is set by the store while an introductory offer is
- * running, and `expirationDate` is when it converts to a paid renewal.
+ * What plan this member is on.
+ *
+ * RevenueCat answers the trial question and nothing else can — `periodType`
+ * and `expirationDate` are the store's own record of an introductory offer.
+ * But it is not the only way to hold a subscription any more: Phil can grant
+ * one from the admin, and RevenueCat has never heard of those. Asking it
+ * alone reported a granted member as `free`, so the app unlocked their content
+ * (the server decides that) while the menu badge and the dashboard chip both
+ * called them a free account.
+ *
+ * So the server is asked first. It is the only place that knows about both
+ * kinds of subscription. RevenueCat is still consulted afterwards, because a
+ * server that says "subscribed" cannot tell us whether the member is inside a
+ * free trial, and "Free week · 3 days left" is worth getting right.
  */
-async function readPlanState(): Promise<{ state: PlanState; daysLeft: number }> {
+async function readPlanState(
+  navigation: any,
+): Promise<{ state: PlanState; daysLeft: number }> {
+  let serverSubscribed = false;
+  try {
+    const res: any = await getServerSubscription(navigation);
+    const body = res?.data ?? res;
+    serverSubscribed = body?.is_subscribed === true;
+  } catch {
+    // Falls through to RevenueCat, which is the old behaviour.
+  }
+
   try {
     const info = await Purchases.getCustomerInfo();
     const active = Object.values(info?.entitlements?.active ?? {});
@@ -118,13 +144,19 @@ async function readPlanState(): Promise<{ state: PlanState; daysLeft: number }> 
       return { state: 'subscribed', daysLeft: 0 };
     }
 
+    // No store entitlement. If the server says they are subscribed, it is an
+    // admin grant — RevenueCat is right that nothing was bought, and wrong
+    // that there is no subscription.
+    if (serverSubscribed) return { state: 'subscribed', daysLeft: 0 };
+
     const everSubscribed =
       Object.keys(info?.entitlements?.all ?? {}).length > 0 ||
       (info?.allPurchaseDates && Object.keys(info.allPurchaseDates).length > 0);
 
     return { state: everSubscribed ? 'trial-expired' : 'free', daysLeft: 0 };
   } catch {
-    return { state: 'free', daysLeft: 0 };
+    // RevenueCat unreachable — the server's answer is still worth having.
+    return { state: serverSubscribed ? 'subscribed' : 'free', daysLeft: 0 };
   }
 }
 
@@ -158,7 +190,7 @@ export function useDashboardData(navigation: any): DashboardData {
         const [courseRes, feedRes, plan, tutorialMarks] = await Promise.all([
           getCourseList(navigation).catch(() => null),
           getFeedList(navigation).catch(() => null),
-          readPlanState(),
+          readPlanState(navigation),
           loadTutorialProgress(navigation),
         ]);
 

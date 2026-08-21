@@ -3,6 +3,7 @@ import EncryptedStorage from 'react-native-encrypted-storage';
 import Utils from '../../app/helpers/Utilities';
 import { onUserLogOutCleverTap } from '../../App';
 import Purchases from 'react-native-purchases';
+import { getServerSubscription } from '../../app/helpers/ApiHelper';
 
 interface User {
   id?: string;
@@ -21,8 +22,10 @@ interface UserContextType {
   isLoggedIn: boolean;
   isLoading: boolean;
   logout: () => void;
-  isSubscribed: boolean; // 👈 added
-  setIsSubscribed: (value: boolean) => void; // 👈 added
+  isSubscribed: boolean;
+  setIsSubscribed: (value: boolean) => void;
+  /** Re-reads it from the server. Call after a purchase or a restore. */
+  refreshSubscription: () => Promise<void>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -62,6 +65,39 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
     loadUserFromStorage();
   }, []);
+
+  /**
+   * Whether this member has premium, asked of the server.
+   *
+   * It has to be the server, not RevenueCat. A subscription can now also be
+   * granted from the admin, and RevenueCat has no record of those — asking it
+   * reported a granted member as free. The endpoint knows about both kinds.
+   *
+   * This was the whole bug behind the menu badge: `setIsSubscribed` existed
+   * and was exported, and nothing in the app had ever called it, so the flag
+   * sat at its initial `false` and the menu read "Free account" for everyone,
+   * paying members included.
+   */
+  const refreshSubscription = React.useCallback(async () => {
+    if (!user) {
+      setIsSubscribed(false);
+      return;
+    }
+    try {
+      // navigation is only used to log out on a 401, and Utils.logout does not
+      // touch it, so there is nothing to pass here.
+      const res: any = await getServerSubscription(null);
+      const body = res?.data ?? res;
+      setIsSubscribed(body?.is_subscribed === true);
+    } catch {
+      // Leave the last known answer rather than downgrading someone to free
+      // because one request failed.
+    }
+  }, [user]);
+
+  useEffect(() => {
+    refreshSubscription();
+  }, [refreshSubscription]);
 
   // Store token in Utilities for API calls
   useEffect(() => {
@@ -132,8 +168,9 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     isLoggedIn,
     isLoading,
     logout,
-    isSubscribed,       // 👈 added
-    setIsSubscribed,    // 👈 added
+    isSubscribed,
+    setIsSubscribed,
+    refreshSubscription,
   };
 
   return (

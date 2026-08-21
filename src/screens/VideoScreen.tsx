@@ -267,13 +267,6 @@ const VideoScreen = ({ route, navigation }: any) => {
     }
   };
 
-  const categories: string[] = (() => {
-    const raw = videoDetails?.tag_category;
-    if (!raw) return [];
-    const list = Array.isArray(raw) ? raw : [raw];
-    return list.map((c: any) => String(c?.name ?? c ?? '').trim()).filter(Boolean);
-  })();
-
   const related: any[] = Array.isArray(videoDetails?.related_feeds)
     ? videoDetails.related_feeds.slice(0, 4)
     : [];
@@ -340,15 +333,11 @@ const VideoScreen = ({ route, navigation }: any) => {
             </Text>
           </TouchableOpacity>
 
-          {categories.length > 0 && (
-            <View style={styles.tags}>
-              {categories.map(c => (
-                <View key={c} style={styles.tag}>
-                  <Text style={styles.tagText}>{c}</Text>
-                </View>
-              ))}
-            </View>
-          )}
+          {/* The audience tags — Athlete, Coach, Homepage, Fitness Enthusiast —
+              used to be listed here. They say who a tutorial is aimed at, not
+              what it is, so they told the person already watching it nothing.
+              They have been retired from the admin too; the field is still on
+              the record, just not shown. */}
 
           <Text style={styles.title}>{videoDetails?.headline || 'Video'}</Text>
 
@@ -539,23 +528,6 @@ const styles = StyleSheet.create({
   },
   doneTextOn: { color: theme.color.status.successOnDark },
 
-  tags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.space.xs,
-    marginTop: theme.space.lg,
-  },
-  tag: {
-    backgroundColor: theme.color.brand.subtle,
-    borderRadius: 999,
-    paddingHorizontal: theme.space.md,
-    paddingVertical: 4,
-  },
-  tagText: {
-    fontFamily: theme.font.semibold,
-    fontSize: theme.type.caption.fontSize,
-    color: theme.color.brand.base,
-  },
 
   title: {
     fontFamily: theme.font.bold,
