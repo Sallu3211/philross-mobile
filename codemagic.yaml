@@ -188,6 +188,20 @@ workflows:
           # Not --frozen-lockfile: yarn.lock is gitignored, so there is no
           # lockfile in the repo for it to freeze against.
           yarn install
+      - name: Install the Android SDK pieces this project pins
+        script: |
+          # The build asks for compileSdk 35, build-tools 35.0.0 and NDK
+          # 28.0.12674087 (android/build.gradle). The macOS image does not
+          # ship that NDK, so Gradle tried to fetch it mid-build through the
+          # legacy SDK downloader and died there — the failure showed up as a
+          # stack trace inside `LegacyDownloader.downloadAndStream`, several
+          # layers away from anything that says "missing NDK".
+          #
+          # Fetching them up front turns that into an explicit, readable step.
+          # sdkmanager is a no-op for anything already present, so this costs
+          # nothing on an image that happens to have them.
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager --install             "platforms;android-35"             "build-tools;35.0.0"             "ndk;28.0.12674087"
       - name: Decode keystore
         script: |
           echo $CM_KEYSTORE | base64 --decode > android/app/philross.keystore
