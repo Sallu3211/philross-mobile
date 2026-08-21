@@ -192,16 +192,33 @@ workflows:
         script: |
           # The build asks for compileSdk 35, build-tools 35.0.0 and NDK
           # 28.0.12674087 (android/build.gradle). The macOS image does not
-          # ship that NDK, so Gradle tried to fetch it mid-build through the
-          # legacy SDK downloader and died there — the failure showed up as a
-          # stack trace inside `LegacyDownloader.downloadAndStream`, several
-          # layers away from anything that says "missing NDK".
+          # ship that NDK, so Gradle went to fetch it mid-build through the
+          # legacy SDK downloader and died there — surfacing as a stack trace
+          # in LegacyDownloader.downloadAndStream, several layers from
+          # anything that says "missing NDK".
           #
-          # Fetching them up front turns that into an explicit, readable step.
-          # sdkmanager is a no-op for anything already present, so this costs
-          # nothing on an image that happens to have them.
-          yes | sdkmanager --licenses > /dev/null 2>&1 || true
-          sdkmanager --install             "platforms;android-35"             "build-tools;35.0.0"             "ndk;28.0.12674087"
+          # sdkmanager is not on PATH here (the first attempt at this step
+          # exited 127), so it is located rather than called by name.
+          SDKMANAGER=""
+          for candidate in             "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"             "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"             "$ANDROID_SDK_ROOT/tools/bin/sdkmanager"             "$ANDROID_HOME/tools/bin/sdkmanager"; do
+            if [ -x "$candidate" ]; then SDKMANAGER="$candidate"; break; fi
+          done
+
+          if [ -z "$SDKMANAGER" ]; then
+            SDKMANAGER=$(find "${ANDROID_SDK_ROOT:-$ANDROID_HOME}" -name sdkmanager -type f 2>/dev/null | head -1)
+          fi
+
+          if [ -z "$SDKMANAGER" ]; then
+            # Not fatal. Gradle can still fetch what it needs; this step is
+            # here to make that fetch explicit, not to be the only way it can
+            # happen. Failing here would hide whatever the build would say.
+            echo "sdkmanager not found under ${ANDROID_SDK_ROOT:-$ANDROID_HOME} — leaving it to Gradle"
+            exit 0
+          fi
+
+          echo "Using $SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+          "$SDKMANAGER" --install             "platforms;android-35"             "build-tools;35.0.0"             "ndk;28.0.12674087"
       - name: Decode keystore
         script: |
           echo $CM_KEYSTORE | base64 --decode > android/app/philross.keystore
