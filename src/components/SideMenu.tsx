@@ -67,7 +67,7 @@ import InstagramLogo from '../../assets/icons/instagram.png';
 import WhatsappLogo from '../../assets/icons/whatsapp.png';
 import TelegramLogo from '../../assets/icons/telegram.png';
 import XLogo from '../../assets/icons/x_icon.png';
-import { TikTokRound, YouTubeRound } from './ui/brandMarks';
+import { LinkedInRound, TikTokRound, YouTubeRound } from './ui/brandMarks';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const DRAWER_W = Math.min(SCREEN_W * 0.84, 340);
@@ -76,18 +76,27 @@ const DRAWER_W = Math.min(SCREEN_W * 0.84, 340);
 const SOCIAL_SIZE = 32;
 
 /**
- * Every outbound link in one place. Swap a URL here and it changes everywhere;
- * set one to null to hide that mark without touching the layout.
+ * Fallback links, used only until the admin's answer arrives — and if it never
+ * does.
+ *
+ * These used to be the whole story, hardcoded, with tiktok, x, whatsapp and
+ * telegram pinned to null. Phil had TikTok and LinkedIn set up in the admin
+ * and neither could ever appear in the app, while the YouTube and Instagram
+ * URLs here had drifted from the ones he had configured. Whatever is in the
+ * admin is now what shows.
  */
 export const SOCIAL_LINKS: Record<string, string | null> = {
   youtube: 'https://www.youtube.com/@TheMasterPhil',
   instagram: 'https://www.instagram.com/themasterphil',
   facebook: 'https://www.facebook.com/masterphilross',
+  linkedin: null,
   tiktok: null,
   x: null,
   whatsapp: null,
   telegram: null,
 };
+
+const SOCIAL_ENDPOINT = 'https://api.philross.com/sitecontent/social-media-links/';
 
 interface SideMenuProps {
   isVisible: boolean;
@@ -108,6 +117,42 @@ interface Item {
 
 const SideMenu = ({ isVisible, onClose, navigation }: SideMenuProps) => {
   const { logout, isSubscribed } = useUser();
+
+  /**
+   * The links Phil has configured, fetched once per mount.
+   *
+   * Seeded with the constants above so the row is never empty on first paint
+   * and still works offline; whatever the admin returns replaces them. Keys
+   * the API does not mention are dropped rather than left at their old
+   * hardcoded value — a link Phil has removed should disappear.
+   */
+  const [links, setLinks] = React.useState<Record<string, string | null>>(
+    SOCIAL_LINKS,
+  );
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(SOCIAL_ENDPOINT);
+        const json = await res.json();
+        const data = json?.data;
+        if (alive && data && typeof data === 'object') {
+          const next: Record<string, string | null> = {};
+          Object.keys(data).forEach(k => {
+            const url = String(data[k] ?? '').trim();
+            if (url) next[k.toLowerCase()] = url;
+          });
+          if (Object.keys(next).length > 0) setLinks(next);
+        }
+      } catch {
+        // Keeps the fallbacks.
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   /**
    * The route the drawer opened over. Marking it means the menu answers
@@ -347,15 +392,22 @@ const SideMenu = ({ isVisible, onClose, navigation }: SideMenuProps) => {
     );
   };
 
+  /**
+   * Only the marks Phil has actually set up, in a fixed order.
+   *
+   * The order is ours rather than the API's: a JSON object has no meaningful
+   * order, and the row should not rearrange itself between loads.
+   */
   const socials = [
     { key: 'youtube', Svg: YouTubeRound },
     { key: 'instagram', png: InstagramLogo },
     { key: 'facebook', png: FacebookLogo },
     { key: 'tiktok', Svg: TikTokRound },
+    { key: 'linkedin', Svg: LinkedInRound },
     { key: 'x', png: XLogo },
     { key: 'whatsapp', png: WhatsappLogo },
     { key: 'telegram', png: TelegramLogo },
-  ].filter(s => !!SOCIAL_LINKS[s.key]);
+  ].filter(s => !!links[s.key]);
 
   if (!isVisible) return null;
 
@@ -448,7 +500,7 @@ const SideMenu = ({ isVisible, onClose, navigation }: SideMenuProps) => {
                   <TouchableOpacity
                     key={s.key}
                     style={styles.socialBtn}
-                    onPress={() => openLink(SOCIAL_LINKS[s.key] as string)}
+                    onPress={() => openLink(links[s.key] as string)}
                     activeOpacity={0.6}
                     hitSlop={theme.hitSlop}
                     accessibilityRole="button"
