@@ -16,9 +16,8 @@ import FilterDropdown from '../components/ui/FilterDropdown';
 import MediaListCard from '../components/ui/MediaListCard';
 import { EmptyState, ErrorState, LoadingState } from '../components/ui/StateView';
 import { Check, Info, Play } from '../components/ui/icons';
-import { getFeedCategories, getWorkoutTypes, getFeedList } from '../../app/helpers/ApiHelper';
+import { getWorkoutTypes, getFeedList } from '../../app/helpers/ApiHelper';
 import EncryptedStorage from 'react-native-encrypted-storage';
-import { pushCleverTapEvent } from '../../App';
 import { checkSubscriptionAndProceed, hasActiveSubscription } from '../services/subscriptionService';
 import { useFocusEffect } from '@react-navigation/native';
 import {
@@ -29,9 +28,6 @@ import {
 const FeedScreen = ({ navigation }: any) => {
   const [search, setSearch] = useState('');
   const [showSideMenu, setShowSideMenu] = useState(false);
-  const [categories, setCategories] = useState<any[]>([]);
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [, setIsLoadingCategories] = useState(false);
   
   // New state for workout types and feed data
   const [workoutTypes, setWorkoutTypes] = useState<any[]>([]);
@@ -42,7 +38,7 @@ const FeedScreen = ({ navigation }: any) => {
   const [, setIsLoadingWorkoutTypes] = useState(false);
   const [feedError, setFeedError] = useState<string | null>(null);
 
-  // Fetch categories when component mounts
+  // Fetch workout types when component mounts
   useEffect(() => {
     // Add delay to ensure tokens are properly stored
     const delayFetch = async () => {
@@ -51,7 +47,6 @@ const FeedScreen = ({ navigation }: any) => {
         const token = await EncryptedStorage.getItem('authToken');
         
         if (token) {
-          fetchCategories();
           fetchWorkoutTypes();
         } else {
           navigation.replace('Login');
@@ -76,41 +71,6 @@ const FeedScreen = ({ navigation }: any) => {
   }, [navigation])
   );
 
-  const fetchCategories = async () => {
-    try {
-      setIsLoadingCategories(true);
-      const response = await getFeedCategories(navigation);
-      
-      // Check if the response indicates an error
-      if (response?.success === false) {
-        console.error('Categories API returned error:', response.message);
-        setCategories([]);
-        return;
-      }
-      
-      // Handle different response structures from apiCall
-      if (response?.success && response?.data?.results && Array.isArray(response.data.results)) {
-        setCategories(response.data.results);
-      } else if (response?.success && response?.data && Array.isArray(response.data)) {
-        setCategories(response.data);
-      } else if (response?.data?.results && Array.isArray(response.data.results)) {
-        setCategories(response.data.results);
-      } else if (response?.data && Array.isArray(response.data)) {
-        setCategories(response.data);
-      } else if (response && Array.isArray(response)) {
-        setCategories(response);
-      } else {
-        console.warn('Failed to fetch categories - no data found:', response);
-        setCategories([]);
-      }
-    } catch (error) {
-      console.error('Error fetching categories:', error);
-    } finally {
-      setIsLoadingCategories(false);
-    }
-  };
-
-  // Fetch workout types from API
   const fetchWorkoutTypes = async () => {
     try {
       setIsLoadingWorkoutTypes(true);
@@ -200,18 +160,6 @@ const FeedScreen = ({ navigation }: any) => {
   };
 
   // Handle category selection (multiple selection)
-  /**
-   * The two audience categories the client tracks.
-   *
-   * These used to fire as each chip was tapped. With an Apply step, a tap is
-   * only a candidate — reporting it then would count selections nobody ever
-   * committed to, so they are reported when the filter is applied instead.
-   */
-  const reportCategorySelections = (names: string[]) => {
-    if (names.includes('Athlete')) pushCleverTapEvent('athlete_selected', {});
-    if (names.includes('Coach')) pushCleverTapEvent('coach_selected', {});
-  };
-
   // Apply filters and fetch filtered data
   /**
    * Takes the selections as arguments rather than reading state.
@@ -221,26 +169,20 @@ const FeedScreen = ({ navigation }: any) => {
    * selection, because the setState calls beside this one have not landed yet.
    * State is still the default, for any caller that has already updated it.
    */
-  const applyFilters = async (
-    cats: string[] = selectedCategories,
-    types: string[] = selectedWorkoutTypes,
-  ) => {
+  const applyFilters = async (types: string[] = selectedWorkoutTypes) => {
     // Convert workout type names to IDs for the API
     const workoutTypeIds = types.map(typeName => {
       const workoutType = workoutTypes.find(wt => wt.name === typeName);
       return workoutType ? workoutType.id : null;
     }).filter(id => id !== null);
 
-    // Convert category names to IDs for the API
-    const categoryIds = cats.map(categoryName => {
-      const category = categories.find(cat => (cat.name || cat) === categoryName);
-      return category ? category.id : null;
-    }).filter(id => id !== null);
-
     setFeedError(null); // Clear any previous errors
-    await fetchFeedData({ 
+    // `category` is still sent, always empty. The endpoint treats a missing
+    // key and an empty one the same, and sending it keeps the shape of the
+    // request stable for anything reading these calls.
+    await fetchFeedData({
       workout_type: workoutTypeIds,
-      category: categoryIds.length > 0 ? categoryIds.join(',') : ''
+      category: '',
     });
   };
 
@@ -286,17 +228,12 @@ const FeedScreen = ({ navigation }: any) => {
     (a: any, b: any) => Number(!!a?.locked) - Number(!!b?.locked),
   );
 
-  const categoryOptions = categories.map((c: any) => ({
-    id: String(c?.name ?? c),
-    label: String(c?.name ?? c),
-  }));
-
   const workoutOptions = workoutTypes.map((w: any) => ({
     id: String(w?.name ?? w),
     label: String(w?.name ?? w),
   }));
 
-  const filterCount = selectedCategories.length + selectedWorkoutTypes.length;
+  const filterCount = selectedWorkoutTypes.length;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -328,34 +265,28 @@ const FeedScreen = ({ navigation }: any) => {
           style={styles.search}
         />
 
-        {(categoryOptions.length > 0 || workoutOptions.length > 0) && (
+        {workoutOptions.length > 0 && (
           <FilterDropdown
             mode="multi"
-            title="Filters"
+            title="Workout type"
             placeholder="Filter"
             applyLabel="Apply filters"
             style={styles.filterBtn}
+            // Workout type only. The other group held the audience tags —
+            // Athlete, Coach, Homepage, Fitness Enthusiast — which describe
+            // who a tutorial is aimed at, not what the session is. Nobody
+            // browsing tutorials narrows by those, and two groups made the
+            // sheet look like more of a decision than it is.
             groups={[
-              ...(categoryOptions.length > 0
-                ? [{ key: 'category', label: 'Category', options: categoryOptions }]
-                : []),
-              ...(workoutOptions.length > 0
-                ? [{ key: 'workout', label: 'Workout type', options: workoutOptions }]
-                : []),
+              { key: 'workout', label: '', options: workoutOptions },
             ]}
-            selected={{
-              category: selectedCategories,
-              workout: selectedWorkoutTypes,
-            }}
+            selected={{ workout: selectedWorkoutTypes }}
             onApply={next => {
-              const cats = next.category ?? [];
               const types = next.workout ?? [];
-              setSelectedCategories(cats);
               setSelectedWorkoutTypes(types);
-              reportCategorySelections(cats);
               // Passed through rather than read back from state, which has
               // not updated yet at this point.
-              applyFilters(cats, types);
+              applyFilters(types);
             }}
           />
         )}
@@ -404,7 +335,6 @@ const FeedScreen = ({ navigation }: any) => {
                   ? () => setSearch('')
                   : filterCount > 0
                   ? () => {
-                      setSelectedCategories([]);
                       setSelectedWorkoutTypes([]);
                       fetchFeedData();
                     }
