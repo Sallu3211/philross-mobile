@@ -212,7 +212,7 @@ const CourseDetailsScreen = ({ route, navigation }: any) => {
 
   const openLink = async (url?: string) => {
     if (!url) {
-      Alert.alert('Unavailable', 'Enrolment for this course is not open yet.');
+      Alert.alert('Unavailable', 'Enrollment for this course is not open yet.');
       return;
     }
     try {
@@ -450,7 +450,7 @@ const CourseDetailsScreen = ({ route, navigation }: any) => {
               accessibilityRole="button"
             >
               <Text style={styles.ctaText}>
-                {isEnrolled ? 'Go to course' : 'Enrol now'}
+                {isEnrolled ? 'Go to course' : 'Enroll now'}
               </Text>
             </TouchableOpacity>
           </View>
