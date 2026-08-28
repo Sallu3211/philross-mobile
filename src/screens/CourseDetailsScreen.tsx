@@ -293,6 +293,18 @@ const CourseDetailsScreen = ({ route, navigation }: any) => {
     ? courseData.course_videos
     : [];
   const description = plain(courseData?.description);
+
+  /**
+   * The "what you'll get" lines, from the admin.
+   *
+   * Accepts either the objects the API sends or bare strings, because the
+   * field is new and an older build of the API returns neither.
+   */
+  const highlights: string[] = Array.isArray(courseData?.highlights)
+    ? courseData.highlights
+        .map((h: any) => String(h?.text ?? h ?? '').trim())
+        .filter(Boolean)
+    : [];
   const instructor = courseData?.instructor;
 
   return (
@@ -350,8 +362,6 @@ const CourseDetailsScreen = ({ route, navigation }: any) => {
               </View>
             )}
 
-            {!!description && <Text style={styles.body}>{description}</Text>}
-
             {/* Only shown when the API actually names an instructor. The old
                 screen fell back to a stock photo of a stranger. */}
             {!!(instructor?.full_name || instructor?.profile_pic) && (
@@ -377,18 +387,42 @@ const CourseDetailsScreen = ({ route, navigation }: any) => {
               </View>
             )}
 
-            <View style={styles.section}>
-              <Text style={styles.sectionLabel}>
-                Curriculum{videos.length > 0 ? ` · ${videos.length} videos` : ''}
-              </Text>
-
-              {videos.length === 0 ? (
-                <View style={styles.emptyCurriculum}>
-                  <Text style={styles.emptyText}>
-                    The curriculum for this course is not published yet.
-                  </Text>
+            {/* "What you'll get", straight from the admin. Nothing renders
+                until Phil adds some, so an empty list costs no space. */}
+            {highlights.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>What you'll get</Text>
+                <View style={styles.highlights}>
+                  {highlights.map((h: string, i: number) => (
+                    <View key={`${h}-${i}`} style={styles.highlight}>
+                      <View style={styles.highlightTick}>
+                        <Check size={11} color={theme.color.text.inverse} />
+                      </View>
+                      <Text style={styles.highlightText}>{h}</Text>
+                    </View>
+                  ))}
                 </View>
-              ) : (
+              </View>
+            )}
+
+            {/* Was "Curriculum", which read as a promise of a lesson list —
+                and when a course had no videos uploaded it said the curriculum
+                was "not published yet", which people took to mean the course
+                itself was not available. It is the course description, so it
+                says so, and it always has something in it. */}
+            {!!description && (
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>Course Description</Text>
+                <Text style={styles.body}>{description}</Text>
+              </View>
+            )}
+
+            {videos.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>
+                  Lessons · {videos.length}
+                </Text>
+
                 <View style={styles.curriculum}>
                   {videos.map((video: any, i: number) => {
                     const pct = videoProgress[String(video.id)] ?? 0;
@@ -433,8 +467,8 @@ const CourseDetailsScreen = ({ route, navigation }: any) => {
                     );
                   })}
                 </View>
-              )}
-            </View>
+              </View>
+            )}
           </ScrollView>
 
           <View
@@ -670,6 +704,25 @@ const styles = StyleSheet.create({
   },
 
   curriculum: { gap: theme.space.sm },
+
+  highlights: { gap: theme.space.sm },
+  highlight: { flexDirection: 'row', alignItems: 'flex-start', gap: theme.space.md },
+  highlightTick: {
+    width: 19,
+    height: 19,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.color.status.success,
+    marginTop: 1,
+  },
+  highlightText: {
+    flex: 1,
+    fontFamily: theme.font.regular,
+    fontSize: theme.type.bodySm.fontSize,
+    lineHeight: theme.type.bodySm.lineHeight + 4,
+    color: theme.color.text.secondary,
+  },
   lesson: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -715,19 +768,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: theme.color.brand.base,
-  },
-
-  emptyCurriculum: {
-    backgroundColor: theme.color.surface.card,
-    borderRadius: 14,
-    padding: theme.space.xl,
-  },
-  emptyText: {
-    fontFamily: theme.font.regular,
-    fontSize: theme.type.bodySm.fontSize,
-    lineHeight: 20,
-    color: theme.color.text.muted,
-    textAlign: 'center',
   },
 
   bar: {
