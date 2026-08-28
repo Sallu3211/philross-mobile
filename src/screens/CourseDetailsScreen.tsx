@@ -662,9 +662,13 @@ const styles = StyleSheet.create({
   body: {
     fontFamily: theme.font.regular,
     fontSize: theme.type.body.fontSize,
-    lineHeight: 23,
+    // Generous for a block of prose that can run several paragraphs — this is
+    // the whole course description now, not a 150-character teaser.
+    lineHeight: 24,
     color: theme.color.text.secondary,
-    marginTop: theme.space.lg,
+    // No marginTop: it sits under a section label that already carries its
+    // own spacing. The old value was for when this floated free under the
+    // title.
   },
 
   section: { marginTop: theme.space['2xl'] },
