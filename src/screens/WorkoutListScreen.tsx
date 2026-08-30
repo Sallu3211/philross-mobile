@@ -55,6 +55,12 @@ const TIMES = [
   { id: 30, label: 'Under 30 min' },
 ];
 
+const WEAPONS = [
+  { id: 'blades', label: 'Blades' },
+  { id: 'bats', label: 'Bats' },
+  { id: 'batons', label: 'Batons' },
+];
+
 const WorkoutListScreen = ({ route, navigation }: any) => {
   const { categorySlug, categoryName } = route.params || {};
 
@@ -66,6 +72,21 @@ const WorkoutListScreen = ({ route, navigation }: any) => {
   const [search, setSearch] = useState('');
   const [level, setLevel] = useState<string | null>(null);
   const [maxMinutes, setMaxMinutes] = useState<number | null>(null);
+  const [weapon, setWeapon] = useState<string | null>(null);
+
+  /**
+   * Which filter rows this category offers, decided by the category itself
+   * rather than by this file.
+   *
+   * Every category used to show the same two rows. On the kettlebell
+   * categories that was noise — they *are* the levels, so filtering Beginner
+   * by "Beginner" narrows nothing — and Self-Defense needed a row no other
+   * category has. The flags come through on the route params, and default to
+   * the old behaviour if a screen was opened without them.
+   */
+  const showLevel = route.params?.showLevelFilter ?? true;
+  const showDuration = route.params?.showDurationFilter ?? true;
+  const showWeapon = route.params?.showWeaponFilter ?? false;
 
   const fetchWorkouts = useCallback(
     async (isRefresh = false) => {
@@ -78,6 +99,7 @@ const WorkoutListScreen = ({ route, navigation }: any) => {
           category: categorySlug,
           level: level ?? undefined,
           max_minutes: maxMinutes ?? undefined,
+          weapon: weapon ?? undefined,
           search: search.trim() || undefined,
         });
 
@@ -94,7 +116,7 @@ const WorkoutListScreen = ({ route, navigation }: any) => {
         setRefreshing(false);
       }
     },
-    [navigation, categorySlug, level, maxMinutes, search],
+    [navigation, categorySlug, level, maxMinutes, weapon, search],
   );
 
   useEffect(() => {
@@ -103,10 +125,11 @@ const WorkoutListScreen = ({ route, navigation }: any) => {
     return () => clearTimeout(t);
   }, [fetchWorkouts]);
 
-  const activeFilters = (level ? 1 : 0) + (maxMinutes ? 1 : 0);
+  const activeFilters = (level ? 1 : 0) + (maxMinutes ? 1 : 0) + (weapon ? 1 : 0);
   const clearAll = () => {
     setLevel(null);
     setMaxMinutes(null);
+    setWeapon(null);
     setSearch('');
   };
 
@@ -153,21 +176,35 @@ const WorkoutListScreen = ({ route, navigation }: any) => {
           placeholder={`Search in ${categoryName ?? 'this category'}`}
         />
 
-        <View style={styles.chipRow}>
-          {LEVELS.map(l =>
-            chip(l.id, l.label, level === l.id, () =>
-              setLevel(level === l.id ? null : l.id),
-            ),
-          )}
-        </View>
+        {showLevel && (
+          <View style={styles.chipRow}>
+            {LEVELS.map(l =>
+              chip(l.id, l.label, level === l.id, () =>
+                setLevel(level === l.id ? null : l.id),
+              ),
+            )}
+          </View>
+        )}
 
-        <View style={styles.chipRow}>
-          {TIMES.map(t =>
-            chip(String(t.id), t.label, maxMinutes === t.id, () =>
-              setMaxMinutes(maxMinutes === t.id ? null : t.id),
-            ),
-          )}
-        </View>
+        {showDuration && (
+          <View style={styles.chipRow}>
+            {TIMES.map(t =>
+              chip(String(t.id), t.label, maxMinutes === t.id, () =>
+                setMaxMinutes(maxMinutes === t.id ? null : t.id),
+              ),
+            )}
+          </View>
+        )}
+
+        {showWeapon && (
+          <View style={styles.chipRow}>
+            {WEAPONS.map(w =>
+              chip(w.id, w.label, weapon === w.id, () =>
+                setWeapon(weapon === w.id ? null : w.id),
+              ),
+            )}
+          </View>
+        )}
 
         {(activeFilters > 0 || !!search.trim()) && (
           <TouchableOpacity

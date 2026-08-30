@@ -831,6 +831,8 @@ export const getWorkouts = async (
         /** Comma separated; a workout must need every item named. */
         equipment?: string;
         max_minutes?: number;
+        /** blades | bats | batons — only Self-Defense offers this today. */
+        weapon?: string;
     },
 ) => {
     try {
@@ -841,6 +843,7 @@ export const getWorkouts = async (
         if (params?.search) query.append('search', params.search);
         if (params?.equipment) query.append('equipment', params.equipment);
         if (params?.max_minutes) query.append('max_minutes', String(params.max_minutes));
+        if (params?.weapon) query.append('weapon', params.weapon);
 
         const qs = query.toString();
         return await apiCall({

@@ -46,6 +46,10 @@ interface Category {
   group_label: string;
   description?: string;
   workout_count: number;
+  /** Which filter rows this category offers. Set per category in the admin. */
+  show_level_filter?: boolean;
+  show_duration_filter?: boolean;
+  show_weapon_filter?: boolean;
 }
 
 /** Group headings, in the client's order. */
@@ -115,6 +119,12 @@ const WorkoutsScreen = ({ navigation }: any) => {
     navigation.navigate('WorkoutList', {
       categorySlug: category.slug,
       categoryName: category.name,
+      // Carried through so the list screen does not have to fetch the
+      // category again just to find out which filters to draw. `??` rather
+      // than `||`, so an explicit false survives.
+      showLevelFilter: category.show_level_filter ?? true,
+      showDurationFilter: category.show_duration_filter ?? true,
+      showWeaponFilter: category.show_weapon_filter ?? false,
     });
 
   const renderCard = (category: Category, index: number) => {
