@@ -7,7 +7,7 @@
  * first week was free.
  *
  * This screen talks to RevenueCat directly:
- *   getOfferings()  →  products + their pricing phases
+ *   getOfferings() (iOS) / getProducts() (Android) → store products
  *   purchaseSubscriptionOption()  →  buys the *offer* that carries the free
  *                                    trial, not just the base plan
  *
@@ -30,6 +30,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Purchases, {
+  INTRO_ELIGIBILITY_STATUS,
   PRODUCT_CATEGORY,
   PURCHASES_ERROR_CODE,
   type PurchasesStoreProduct,
@@ -43,8 +44,8 @@ import { theme } from '../theme';
 import { refreshServerSubscription } from '../../app/helpers/ApiHelper';
 import { Check, ChevronRight, Lock } from '../components/ui/icons';
 
-/** Product IDs as configured in Play Console / App Store Connect. */
-const PRODUCT_IDS = ['monthly_099', 'annual'];
+/** Play Console IDs. Apple products come from the current iOS offering. */
+const ANDROID_PRODUCT_IDS = ['monthly_099', 'annual'];
 
 const BENEFITS = [
   'Every structured training programme',
@@ -81,14 +82,14 @@ function periodToDays(unit: string | undefined, value: number | undefined): numb
  * Finds the purchasable option that includes a free trial. Android exposes
  * these as subscriptionOptions; iOS carries a single introPrice on the product.
  */
-function resolveTrial(product: PurchasesStoreProduct): {
+function resolveTrial(product: PurchasesStoreProduct, eligibleForTrial: boolean): {
   option: SubscriptionOption | null;
   trialDays: number | null;
 } {
   if (Platform.OS === 'ios') {
-    const intro: any = (product as any).introPrice;
+    const intro = product.introPrice;
     const days =
-      intro && intro.price === 0
+      eligibleForTrial && intro && intro.price === 0
         ? periodToDays(intro.periodUnit, intro.periodNumberOfUnits)
         : null;
     return { option: null, trialDays: days };
@@ -115,38 +116,59 @@ const PaywallScreen = ({ navigation, route }: any) => {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setPlans([]);
+    setSelected(null);
     try {
-      // Deliberately NOT using getOfferings(). The RevenueCat Offering is still
-      // pointed at the legacy `low` product (base plans com-weekly/monthly/
-      // yearly-low), which carries no free trial and the wrong prices. Asking
-      // for our two product IDs by name guarantees we show the subscriptions
-      // that actually have the 7-day trial configured in Play Console.
-      //
-      // Once the Offering is repointed at these IDs, this can go back to
-      // getOfferings() so plans can be reordered without an app release.
-      const products: PurchasesStoreProduct[] = await Purchases.getProducts(
-        PRODUCT_IDS,
-        PRODUCT_CATEGORY.SUBSCRIPTION,
-      );
+      // The current Apple offering uses com.weekly.low / com.monthly.low /
+      // com.yearly.low. The Android IDs returned no products on real iPhones.
+      // Keep Android's direct lookup: its offering still uses legacy base plans
+      // without the trial. Use only the current iOS offering, not other tiers.
+      const products: PurchasesStoreProduct[] = Platform.OS === 'ios'
+        ? (await Purchases.getOfferings()).current?.availablePackages.map(
+            pkg => pkg.product,
+          ) ?? []
+        : await Purchases.getProducts(
+            ANDROID_PRODUCT_IDS,
+            PRODUCT_CATEGORY.SUBSCRIPTION,
+          );
 
       if (products.length === 0) {
         setError(
-          'We could not load the plans right now. Check your connection and try again.',
+          'Subscription plans are currently unavailable. Please try again later.',
         );
-        setPlans([]);
         return;
       }
 
-      const built: Plan[] = products.map(product => {
-        const { option, trialDays } = resolveTrial(product);
+      // An introductory offer on the product does not mean this Apple account
+      // can use it. An eligibility failure must not prevent buying a plan.
+      let trialEligibility: Awaited<ReturnType<typeof Purchases.checkTrialOrIntroductoryPriceEligibility>> = {};
+      const trialProductIds = products
+        .filter(product => product.introPrice?.price === 0)
+        .map(product => product.identifier);
+      if (Platform.OS === 'ios' && trialProductIds.length > 0) {
+        try {
+          trialEligibility = await Purchases.checkTrialOrIntroductoryPriceEligibility(trialProductIds);
+        } catch (e) {
+          console.log('Paywall trial eligibility unavailable:', e);
+        }
+      }
 
-        // Read the billing period from the product itself rather than guessing
-        // from its identifier — two of the legacy plans were both labelled
-        // "Monthly" because one was really a weekly base plan.
+      const built: Plan[] = products.map(product => {
+        const eligibleForTrial = trialEligibility[product.identifier]?.status ===
+          INTRO_ELIGIBILITY_STATUS.INTRO_ELIGIBILITY_STATUS_ELIGIBLE;
+        const { option, trialDays } = resolveTrial(product, eligibleForTrial);
+
+        // iOS has no Android subscriptionOptions. Read its ISO billing period
+        // so the weekly Apple product is not incorrectly labelled monthly.
         const phase = option?.fullPricePhase ?? product.defaultOption?.fullPricePhase;
         const unit = String((phase?.billingPeriod as any)?.unit ?? '').toUpperCase();
-        const isYearly = unit.includes('YEAR') || /annual|year/i.test(product.identifier);
-        const isWeekly = unit.includes('WEEK');
+        const period = product.subscriptionPeriod;
+        const isYearly = period
+          ? period === 'P1Y' || period === 'P12M'
+          : unit.includes('YEAR') || /annual|year/i.test(product.identifier);
+        const isWeekly = period
+          ? period === 'P1W' || period === 'P7D'
+          : unit.includes('WEEK');
 
         return {
           product,
@@ -159,7 +181,8 @@ const PaywallScreen = ({ navigation, route }: any) => {
       });
 
       // Monthly first, yearly last so the saving badge lands on the anchor.
-      built.sort(a => (a.title === 'Monthly' ? -1 : 1));
+      const planOrder: Record<string, number> = { Monthly: 0, Weekly: 1, Yearly: 2 };
+      built.sort((a, b) => planOrder[a.title] - planOrder[b.title]);
 
       const monthly = built.find(p => p.title === 'Monthly');
       const yearly = built.find(p => p.title === 'Yearly');
@@ -174,7 +197,11 @@ const PaywallScreen = ({ navigation, route }: any) => {
       setSelected(yearly?.product.identifier ?? built[0]?.product.identifier ?? null);
     } catch (e: any) {
       console.log('Paywall load failed:', e);
-      setError('Something went wrong loading the plans. Please try again.');
+      const isNetworkError = e?.code === PURCHASES_ERROR_CODE.NETWORK_ERROR ||
+        e?.code === PURCHASES_ERROR_CODE.OFFLINE_CONNECTION_ERROR;
+      setError(isNetworkError
+        ? 'We could not connect to the store. Check your connection and try again.'
+        : 'Subscription plans are currently unavailable. Please try again later.');
     } finally {
       setLoading(false);
     }
@@ -212,7 +239,7 @@ const PaywallScreen = ({ navigation, route }: any) => {
   }, [navigation, route]);
 
   const onPurchase = useCallback(async () => {
-    if (!current || purchasing) return;
+    if (!current || loading || error || purchasing) return;
     setPurchasing(true);
     try {
       // Buy the trial-bearing option where one exists, else the plain product.
@@ -239,7 +266,7 @@ const PaywallScreen = ({ navigation, route }: any) => {
     } finally {
       setPurchasing(false);
     }
-  }, [current, purchasing, finish]);
+  }, [current, loading, error, purchasing, finish]);
 
   const onRestore = useCallback(async () => {
     setPurchasing(true);
@@ -261,6 +288,7 @@ const PaywallScreen = ({ navigation, route }: any) => {
   }, [finish]);
 
   const trialDays = current?.trialDays ?? null;
+  const purchaseDisabled = !current || loading || !!error || purchasing;
 
   const ctaLabel = purchasing
     ? ''
@@ -364,9 +392,9 @@ const PaywallScreen = ({ navigation, route }: any) => {
         )}
 
         <TouchableOpacity
-          style={[styles.cta, (!current || purchasing) && styles.ctaDisabled]}
+          style={[styles.cta, purchaseDisabled && styles.ctaDisabled]}
           onPress={onPurchase}
-          disabled={!current || purchasing}
+          disabled={purchaseDisabled}
           activeOpacity={0.9}
           accessibilityRole="button"
         >
